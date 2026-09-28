@@ -10,6 +10,7 @@ matsutake/
   Cargo.lock
   rust-toolchain.toml         the Rust version of the workspace
   .gitignore
+  .vscode/settings.json       the VS Code settings for rust-analyzer
   crates/
     jpdag/                    the core library
     ingest/                   the binary that writes content.db
