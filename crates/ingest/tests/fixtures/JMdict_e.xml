@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE JMdict [
+<!ENTITY iK "word containing irregular kanji usage">
+<!ENTITY rK "rarely used kanji form">
+<!ENTITY ateji "ateji (phonetic) reading">
+<!ENTITY ik "word containing irregular kana usage">
+<!ENTITY uk "word usually written using kana alone">
+<!ENTITY n "noun (common) (futsuumeishi)">
+<!ENTITY adv "adverb (fukushi)">
+<!ENTITY int "interjection (kandoushi)">
+<!ENTITY med "medicine">
+<!ENTITY ksb "Kansai-ben">
+]>
+<!-- JMdict created: 2026-09-28 -->
+<JMdict>
+<!-- 2 kanji forms, 1 with rK. -->
+<entry><ent_seq>1000010</ent_seq>
+<k_ele><keb>正</keb></k_ele>
+<k_ele><keb>誤</keb><ke_inf>&rK;</ke_inf></k_ele>
+<sense><pos>&n;</pos><gloss>correct</gloss></sense></entry>
+<!-- uk in the first sense. -->
+<entry><ent_seq>1000030</ent_seq>
+<k_ele><keb>一寸</keb></k_ele>
+<r_ele><reb>ちょっと</reb></r_ele>
+<sense><misc>&uk;</misc><gloss>a little</gloss></sense></entry>
+<!-- An iteration mark. -->
+<entry><ent_seq>1000040</ent_seq><k_ele><keb>人々</keb></k_ele><sense><gloss>people</gloss></sense></entry>
+<!-- A small ke. -->
+<entry><ent_seq>1000050</ent_seq><k_ele><keb>一ヶ月</keb></k_ele><sense><gloss>one month</gloss></sense></entry>
+<!-- Okurigana. -->
+<entry><ent_seq>1000060</ent_seq><k_ele><keb>取り扱い</keb></k_ele><sense><gloss>handling</gloss></sense></entry>
+<!-- No kanji. -->
+<entry><ent_seq>1000070</ent_seq><k_ele><keb>Tシャツ</keb></k_ele><sense><gloss>T-shirt</gloss></sense></entry>
+<!-- A shime mark. -->
+<entry><ent_seq>1000080</ent_seq><k_ele><keb>〆切</keb></k_ele><sense><gloss>deadline</gloss></sense></entry>
+<!-- 𠮟 (U+20B9F) is a kanji of a word with no KanjiVG entry. -->
+<entry><ent_seq>1000090</ent_seq><k_ele><keb>𠮟る</keb></k_ele><sense><gloss>to scold</gloss></sense></entry>
+<!-- U+FA19, a compatibility ideograph. -->
+<entry><ent_seq>1000100</ent_seq><k_ele><keb>神</keb></k_ele><sense><gloss>god</gloss></sense></entry>
+<!-- U+FA11, a unified ideograph in the compatibility block. -->
+<entry><ent_seq>1000110</ent_seq><k_ele><keb>﨑</keb></k_ele><sense><gloss>cape</gloss></sense></entry>
+<!-- The same kanji 2 times. -->
+<entry><ent_seq>1000120</ent_seq><k_ele><keb>日日</keb></k_ele><sense><gloss>every day</gloss></sense></entry>
+<!-- Words with a KanjiVG entry. -->
+<entry><ent_seq>1000130</ent_seq><k_ele><keb>語</keb></k_ele><sense><gloss>language</gloss></sense></entry>
+<entry><ent_seq>1000140</ent_seq><k_ele><keb>休む</keb></k_ele><sense><gloss>rest</gloss></sense></entry>
+<entry><ent_seq>1000150</ent_seq><k_ele><keb>池</keb></k_ele><sense><gloss>pond</gloss></sense></entry>
+<entry><ent_seq>1000160</ent_seq><k_ele><keb>性</keb></k_ele><sense><gloss>nature</gloss></sense></entry>
+<entry><ent_seq>1000170</ent_seq><k_ele><keb>恭しい</keb></k_ele><sense><gloss>respectful</gloss></sense></entry>
+<entry><ent_seq>1000180</ent_seq><k_ele><keb>持つ</keb></k_ele><sense><gloss>hold</gloss></sense></entry>
+<entry><ent_seq>1000190</ent_seq><k_ele><keb>点</keb></k_ele><sense><gloss>point</gloss></sense></entry>
+<entry><ent_seq>1000200</ent_seq><k_ele><keb>飯</keb></k_ele><sense><gloss>meal</gloss></sense></entry>
+<entry><ent_seq>1000210</ent_seq><k_ele><keb>每</keb></k_ele><sense><gloss>every</gloss></sense></entry>
+<!-- An entry with no kanji form. -->
+<entry><ent_seq>1000410</ent_seq><r_ele><reb>ちょっと</reb></r_ele><sense><gloss>a little</gloss></sense></entry>
+<!-- The structure of an entry: forms, restrictions, tags, glosses, and notes. -->
+<entry><ent_seq>1000500</ent_seq>
+<k_ele><keb>一寸</keb><ke_inf>&rK;</ke_inf></k_ele>
+<k_ele><keb>鳥渡</keb><ke_inf>&ateji;</ke_inf><ke_inf>&ik;</ke_inf></k_ele>
+<r_ele><reb>ちょっと</reb></r_ele>
+<r_ele><reb>ちょと</reb><re_restr>鳥渡</re_restr><re_inf>&ik;</re_inf></r_ele>
+<r_ele><reb>チョット</reb><re_nokanji/></r_ele>
+<sense><stagk>一寸</stagk><stagr>ちょっと</stagr><pos>&adv;</pos><misc>&uk;</misc>
+<gloss>a little</gloss><gloss>a bit</gloss><gloss g_type="lit">one inch</gloss></sense>
+<sense><s_inf>before a verb in negative form</s_inf><gloss>(not) easily</gloss></sense>
+<sense><pos>&int;</pos><s_inf>first note</s_inf><s_inf>second note</s_inf><gloss>hey!</gloss></sense>
+<sense><xref>ちょっと</xref></sense>
+</entry>
+<!-- A second entry with 2 kanji forms, 2 readings, and 2 senses. -->
+<entry><ent_seq>1000510</ent_seq>
+<k_ele><keb>明日</keb></k_ele><k_ele><keb>翌日</keb><ke_inf>&iK;</ke_inf></k_ele>
+<r_ele><reb>あした</reb></r_ele><r_ele><reb>あす</reb></r_ele>
+<sense><pos>&n;</pos><field>&med;</field><dial>&ksb;</dial><gloss>tomorrow</gloss></sense>
+<sense><pos>&n;</pos><gloss>the near future</gloss></sense>
+</entry>
+<!-- Restrictions that name no form, and an entity that the DTD does not declare. -->
+<entry><ent_seq>1000520</ent_seq>
+<k_ele><keb>手</keb></k_ele>
+<r_ele><reb>て</reb><re_restr>掌</re_restr></r_ele>
+<sense><stagk>腕</stagk><pos>&n;</pos><misc>&newtag;</misc><gloss>hand</gloss></sense>
+</entry>
+</JMdict>
