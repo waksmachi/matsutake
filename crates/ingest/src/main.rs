@@ -3,5 +3,6 @@
 
 mod jmdict;
 mod source;
+mod words;
 
 fn main() {}
