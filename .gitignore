@@ -1,0 +1,6 @@
+/target/
+/crates/ingest/sources/
+/crates/ingest/out/
+/app/assets/content.db
+/app/build/
+/app/.dart_tool/

@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["crates/jpdag", "crates/ingest"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+jpdag = { path = "crates/jpdag" }
+anyhow = "1.0.104"
+flate2 = "1.1.10"
+quick-xml = "0.42.0"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+unicode-normalization = "0.1.25"
