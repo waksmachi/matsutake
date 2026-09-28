@@ -1,0 +1,31 @@
+# The mutants and their bases: the mutant, a tab, and the base. Docs/ingest-design.md, section 6.5,
+# describes the list.
+#
+# The first 19 rows come from japanese-radicals.csv of Kanji alive
+# (https://github.com/kanjialive/kanji-data-media), under the Creative Commons Attribution 4.0
+# licence (CC BY 4.0).
+亻	人
+氵	水
+扌	手
+忄	心
+⺗	心
+⺌	小
+飠	食
+刂	刀
+犭	犬
+灬	火
+⺤	爪
+耂	老
+礻	示
+衤	衣
+⻌	辵
+攵	攴
+艹	艸
+⻖	阜
+⻏	邑
+#
+# Additions.
+⻞	食
+罒	网
+氺	水
+覀	襾
