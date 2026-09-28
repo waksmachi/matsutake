@@ -1,0 +1,266 @@
+# The rows of content.db for the fixture sources: the table, then the value of each column. A code
+# point is shown as its character, and source.attribution as …. NULL is a NULL value.
+character	⺗
+character	⻞
+character	一
+character	也
+character	五
+character	人
+character	亻
+character	休
+character	共
+character	切
+character	占
+character	反
+character	取
+character	口
+character	吾
+character	寸
+character	寺
+character	心
+character	忄
+character	性
+character	恭
+character	手
+character	扌
+character	扱
+character	持
+character	日
+character	明
+character	月
+character	木
+character	正
+character	母
+character	每
+character	水
+character	氵
+character	池
+character	渡
+character	火
+character	灬
+character	点
+character	生
+character	神
+character	翌
+character	言
+character	語
+character	誤
+character	食
+character	飯
+character	鳥
+character	﨑
+character	𠂉
+character	𠮟
+character_component	休	亻
+character_component	休	木
+character_component	吾	五
+character_component	吾	口
+character_component	性	忄
+character_component	性	生
+character_component	恭	⺗
+character_component	恭	共
+character_component	持	寺
+character_component	持	扌
+character_component	明	日
+character_component	明	月
+character_component	每	母
+character_component	每	𠂉
+character_component	池	也
+character_component	池	氵
+character_component	点	占
+character_component	点	灬
+character_component	語	吾
+character_component	語	言
+character_component	飯	⻞
+character_component	飯	反
+gloss	1	1	correct	NULL
+gloss	10	1	cape	NULL
+gloss	11	1	every day	NULL
+gloss	12	1	language	NULL
+gloss	13	1	rest	NULL
+gloss	14	1	pond	NULL
+gloss	15	1	nature	NULL
+gloss	16	1	respectful	NULL
+gloss	17	1	hold	NULL
+gloss	18	1	point	NULL
+gloss	19	1	meal	NULL
+gloss	2	1	a little	NULL
+gloss	20	1	every	NULL
+gloss	21	1	a little	NULL
+gloss	22	1	a little	NULL
+gloss	22	2	a bit	NULL
+gloss	22	3	one inch	lit
+gloss	23	1	(not) easily	NULL
+gloss	24	1	hey!	NULL
+gloss	26	1	tomorrow	NULL
+gloss	27	1	the near future	NULL
+gloss	28	1	hand	NULL
+gloss	3	1	people	NULL
+gloss	4	1	one month	NULL
+gloss	5	1	handling	NULL
+gloss	6	1	T-shirt	NULL
+gloss	7	1	deadline	NULL
+gloss	8	1	to scold	NULL
+gloss	9	1	god	NULL
+kanji_form	1	1000010	1	正
+kanji_form	10	1000100	1	神
+kanji_form	11	1000110	1	﨑
+kanji_form	12	1000120	1	日日
+kanji_form	13	1000130	1	語
+kanji_form	14	1000140	1	休む
+kanji_form	15	1000150	1	池
+kanji_form	16	1000160	1	性
+kanji_form	17	1000170	1	恭しい
+kanji_form	18	1000180	1	持つ
+kanji_form	19	1000190	1	点
+kanji_form	2	1000010	2	誤
+kanji_form	20	1000200	1	飯
+kanji_form	21	1000210	1	每
+kanji_form	22	1000500	1	一寸
+kanji_form	23	1000500	2	鳥渡
+kanji_form	24	1000510	1	明日
+kanji_form	25	1000510	2	翌日
+kanji_form	26	1000520	1	手
+kanji_form	3	1000030	1	一寸
+kanji_form	4	1000040	1	人々
+kanji_form	5	1000050	1	一ヶ月
+kanji_form	6	1000060	1	取り扱い
+kanji_form	7	1000070	1	Tシャツ
+kanji_form	8	1000080	1	〆切
+kanji_form	9	1000090	1	𠮟る
+kanji_form_kanji	1	正
+kanji_form_kanji	10	神
+kanji_form_kanji	11	﨑
+kanji_form_kanji	12	日
+kanji_form_kanji	13	語
+kanji_form_kanji	14	休
+kanji_form_kanji	15	池
+kanji_form_kanji	16	性
+kanji_form_kanji	17	恭
+kanji_form_kanji	18	持
+kanji_form_kanji	19	点
+kanji_form_kanji	2	誤
+kanji_form_kanji	20	飯
+kanji_form_kanji	21	每
+kanji_form_kanji	22	一
+kanji_form_kanji	22	寸
+kanji_form_kanji	23	渡
+kanji_form_kanji	23	鳥
+kanji_form_kanji	24	日
+kanji_form_kanji	24	明
+kanji_form_kanji	25	日
+kanji_form_kanji	25	翌
+kanji_form_kanji	26	手
+kanji_form_kanji	3	一
+kanji_form_kanji	3	寸
+kanji_form_kanji	4	人
+kanji_form_kanji	5	一
+kanji_form_kanji	5	月
+kanji_form_kanji	6	取
+kanji_form_kanji	6	扱
+kanji_form_kanji	8	切
+kanji_form_kanji	9	𠮟
+kanji_form_tag	2	1
+kanji_form_tag	22	1
+kanji_form_tag	23	4
+kanji_form_tag	23	5
+kanji_form_tag	25	9
+mutant	⺗	心
+mutant	⻞	食
+mutant	亻	人
+mutant	忄	心
+mutant	扌	手
+mutant	氵	水
+mutant	灬	火
+reading	1	1000030	1	ちょっと	0
+reading	2	1000410	1	ちょっと	0
+reading	3	1000500	1	ちょっと	0
+reading	4	1000500	2	ちょと	0
+reading	5	1000500	3	チョット	1
+reading	6	1000510	1	あした	0
+reading	7	1000510	2	あす	0
+reading	8	1000520	1	て	0
+reading_restriction	4	23
+reading_tag	4	6
+sense	1	1000010	1	NULL
+sense	10	1000110	1	NULL
+sense	11	1000120	1	NULL
+sense	12	1000130	1	NULL
+sense	13	1000140	1	NULL
+sense	14	1000150	1	NULL
+sense	15	1000160	1	NULL
+sense	16	1000170	1	NULL
+sense	17	1000180	1	NULL
+sense	18	1000190	1	NULL
+sense	19	1000200	1	NULL
+sense	2	1000030	1	NULL
+sense	20	1000210	1	NULL
+sense	21	1000410	1	NULL
+sense	22	1000500	1	NULL
+sense	23	1000500	2	before a verb in negative form
+sense	24	1000500	3	first note; second note
+sense	25	1000500	4	NULL
+sense	26	1000510	1	NULL
+sense	27	1000510	2	NULL
+sense	28	1000520	1	NULL
+sense	3	1000040	1	NULL
+sense	4	1000050	1	NULL
+sense	5	1000060	1	NULL
+sense	6	1000070	1	NULL
+sense	7	1000080	1	NULL
+sense	8	1000090	1	NULL
+sense	9	1000100	1	NULL
+sense_kanji_form	22	22
+sense_reading	22	3
+sense_tag	1	2
+sense_tag	2	3
+sense_tag	22	3
+sense_tag	22	7
+sense_tag	23	7
+sense_tag	24	8
+sense_tag	25	8
+sense_tag	26	10
+sense_tag	26	11
+sense_tag	26	2
+sense_tag	27	2
+sense_tag	28	12
+sense_tag	28	2
+source	JMdict	2026-09-28	CC BY-SA 4.0	…
+source	Kanji alive	NULL	CC BY 4.0	…
+source	KanjiVG	2025-08-16	CC BY-SA 3.0	…
+tag	1	ke_inf	rK	rarely used kanji form
+tag	10	field	med	medicine
+tag	11	dial	ksb	Kansai-ben
+tag	12	misc	newtag	NULL
+tag	2	pos	n	noun (common) (futsuumeishi)
+tag	3	misc	uk	word usually written using kana alone
+tag	4	ke_inf	ateji	ateji (phonetic) reading
+tag	5	ke_inf	ik	word containing irregular kana usage
+tag	6	re_inf	ik	word containing irregular kana usage
+tag	7	pos	adv	adverb (fukushi)
+tag	8	pos	int	interjection (kandoushi)
+tag	9	ke_inf	iK	word containing irregular kanji usage
+word	1000010
+word	1000030
+word	1000040
+word	1000050
+word	1000060
+word	1000070
+word	1000080
+word	1000090
+word	1000100
+word	1000110
+word	1000120
+word	1000130
+word	1000140
+word	1000150
+word	1000160
+word	1000170
+word	1000180
+word	1000190
+word	1000200
+word	1000210
+word	1000410
+word	1000500
+word	1000510
+word	1000520
