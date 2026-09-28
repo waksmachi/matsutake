@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Each Monday, so that the build checks run on the new data of the sources.
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Check the format
+        run: cargo fmt --all --check
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Run the tests
+        run: cargo test --workspace
+
+  build-checks:
+    name: Full build and build checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/ingest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Find the date
+        id: date
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      # The cache key holds the date, so the workflow downloads the sources 1 time each day at most.
+      # The key also holds the hash of fetch.sh, which gives the KanjiVG release.
+      - name: Restore the sources of today
+        id: cache
+        uses: actions/cache@v6
+        with:
+          path: crates/ingest/sources
+          key: ingest-sources-${{ hashFiles('crates/ingest/fetch.sh') }}-${{ steps.date.outputs.date }}
+      - name: Download the sources
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./fetch.sh
+      - name: Run a full build
+        run: >-
+          cargo run --release -p ingest --
+          --jmdict sources/JMdict_e.gz
+          --kanjivg sources/kanjivg-*.xml.gz
+          --out out
+      - name: Add the build report to the job summary
+        run: |
+          {
+            echo '```'
+            cat out/build-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Run the build checks
+        run: cargo test --release -p ingest --test build_checks -- --ignored
+      - name: Upload the build report and content.db
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: content-db
+          path: |
+            crates/ingest/out/build-report.txt
+            crates/ingest/out/content.db
+          if-no-files-found: ignore
