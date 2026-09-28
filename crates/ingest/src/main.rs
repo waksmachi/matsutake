@@ -3,6 +3,7 @@
 
 mod jmdict;
 mod kanji_links;
+mod kanjivg;
 mod source;
 mod words;
 
