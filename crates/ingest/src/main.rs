@@ -2,6 +2,7 @@
 //! `Docs/ingest-design.md` describes the pipeline.
 
 mod components;
+mod db;
 mod jmdict;
 mod kanji_links;
 mod kanjivg;
