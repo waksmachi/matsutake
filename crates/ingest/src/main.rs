@@ -4,6 +4,7 @@
 mod jmdict;
 mod kanji_links;
 mod kanjivg;
+mod mutants;
 mod source;
 mod words;
 
