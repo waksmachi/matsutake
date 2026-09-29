@@ -4,3 +4,4 @@
 /app/assets/content.db
 /app/build/
 /app/.dart_tool/
+.fvm/
