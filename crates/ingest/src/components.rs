@@ -13,7 +13,7 @@ pub struct CharacterSet {
     /// Number of characters with a KanjiVG entry.
     pub with_entry: usize,
     /// Kanji of a word with no KanjiVG entry.
-    pub uncovered_word_kanji: BTreeSet<char>,
+    pub uncovered_form_kanji: BTreeSet<char>,
     /// Direct components with no KanjiVG entry.
     pub uncovered_components: BTreeSet<char>,
 }
@@ -28,7 +28,7 @@ impl CharacterSet {
 /// Completes the character set from the kanji of the stage 2 rows, the direct components of each
 /// KanjiVG entry, and the stage 4 rows.
 pub fn complete(
-    word_kanji: impl IntoIterator<Item = char>,
+    form_kanji: impl IntoIterator<Item = char>,
     kanjivg: &HashMap<char, Vec<char>>,
     stage4: &[(char, char)],
 ) -> CharacterSet {
@@ -38,10 +38,10 @@ pub fn complete(
     }
 
     let mut set = CharacterSet::default();
-    let word_kanji: BTreeSet<char> = word_kanji.into_iter().collect();
+    let form_kanji: BTreeSet<char> = form_kanji.into_iter().collect();
     // Step 1.
-    let mut unexamined: Vec<char> = word_kanji.iter().copied().collect();
-    set.characters.extend(&word_kanji);
+    let mut unexamined: Vec<char> = form_kanji.iter().copied().collect();
+    set.characters.extend(&form_kanji);
 
     // Steps 2 to 5.
     while let Some(c) = unexamined.pop() {
@@ -56,8 +56,8 @@ pub fn complete(
                 set.character_components.insert((c, component));
                 add(component);
             }
-        } else if word_kanji.contains(&c) {
-            set.uncovered_word_kanji.insert(c);
+        } else if form_kanji.contains(&c) {
+            set.uncovered_form_kanji.insert(c);
         }
         for &base in bases.get(&c).into_iter().flatten() {
             set.mutants.insert((c, base));
@@ -112,7 +112,7 @@ mod tests {
     fn kanji_without_an_entry_is_uncovered() {
         let set = complete(['𠮟'], &kanjivg(&[]), &[]);
         assert_eq!(set.characters, BTreeSet::from(['𠮟']));
-        assert_eq!(set.uncovered_word_kanji, BTreeSet::from(['𠮟']));
+        assert_eq!(set.uncovered_form_kanji, BTreeSet::from(['𠮟']));
     }
 
     #[test]

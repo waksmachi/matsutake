@@ -159,9 +159,9 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
     let _ = writeln!(
         r,
         "\nKanji of a word with no KanjiVG entry: {}",
-        set.uncovered_word_kanji.len()
+        set.uncovered_form_kanji.len()
     );
-    for &c in &set.uncovered_word_kanji {
+    for &c in &set.uncovered_form_kanji {
         let _ = writeln!(r, "  {}", describe(c));
     }
     let _ = writeln!(

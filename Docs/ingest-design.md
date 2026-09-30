@@ -363,16 +363,13 @@ The `g_type` value marks a gloss that is not a plain translation: `lit` (literal
 
 `sense.note` is the text of the `<s_inf>` of the sense, or NULL if the sense has no `<s_inf>`. The
 DTD lets a sense have more than 1 `<s_inf>`. In that case, `sense.note` joins the texts with "; ".
-In the JMdict file of 2026-09-28, 6,869 senses have 1 `<s_inf>`, and no sense has more than 1.
 
 A restriction that names no form is an error in the source. Step 8 skips it, and the build report
 lists it, so 1 error in a daily JMdict file does not stop the build. The reading or sense of a
-skipped restriction then has no restriction for that form. The JMdict file of 2026-09-28 has no such
-restriction.
+skipped restriction then has no restriction for that form.
 
 Step 9 applies a rule of the DTD: the `<pos>` tags of an earlier sense apply to the later senses,
-until a sense gives new `<pos>` tags. The JMdict file of 2026-09-28 has no sense without `<pos>`, so
-step 9 changes no rows today.
+until a sense gives new `<pos>` tags.
 
 The category of a tag is the element that holds the tag. Each pair of category and name gives 1 `tag`
 row, and the DTD gives its description. The name `ik` occurs in 2 elements, so `ik` gives 2 `tag`
@@ -391,9 +388,8 @@ Stage 2 links every kanji form, including a form with the tag `iK`, `oK`, `rK`, 
 forms of a word whose senses have the tag `uk`. So ちょっと links to 鳥 and 渡 through its rare form 鳥渡. A
 query that needs only the usual written forms filters the kanji forms. For example, the query can
 take only the kanji form at position 1, exclude the forms with those 4 tags in `kanji_form_tag`, or
-exclude the words whose first sense has `uk` in `sense_tag`. JMdict lists the usual kanji form
-first: in the JMdict file of 2026-09-28, the first kanji form has 1 of the 4 tags in only 1,272 of
-the 177,596 entries with kanji forms.
+exclude the words whose first sense has `uk` in `sense_tag`. JMdict almost always lists the usual kanji
+form first.
 
 Step 2 removes kana, Latin letters, and marks. 々, 〆, and ヶ have no `Unified_Ideograph` property, so
 人々 gives only 人, and 〆切 gives only 切. The ranges of the property come from
