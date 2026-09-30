@@ -182,7 +182,7 @@ fn one_row_for_each_jmdict_element() {
     let elements = |names: &[&str]| names.iter().map(|n| xml.matches(n).count()).sum::<usize>();
     let conn = content_db();
     for (table, names) in [
-        ("kanji_form", &["<k_ele>"][..]),
+        ("written_form", &["<k_ele>"][..]),
         ("reading", &["<r_ele>"]),
         ("sense", &["<sense>", "<sense/>"]),
         ("gloss", &["<gloss>", "<gloss "]),

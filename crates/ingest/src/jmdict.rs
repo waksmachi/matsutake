@@ -12,7 +12,7 @@ use crate::source::Source;
 /// Category of a tag: the element that holds the tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Category {
-    /// `<ke_inf>`: information about a kanji form, for example `ateji` (phonetic kanji), `iK`
+    /// `<ke_inf>`: information about a written form, for example `ateji` (phonetic kanji), `iK`
     /// (irregular kanji), or `rK` (rare kanji form).
     KeInf,
     /// `<re_inf>`: information about a reading, for example `gikun` (the reading of a meaning),
@@ -68,8 +68,8 @@ pub struct Jmdict {
 pub struct Entry {
     /// `<ent_seq>` value.
     pub seq: u32,
-    /// Kanji forms, in entry order.
-    pub kanji: Vec<KanjiForm>,
+    /// Written forms, in entry order.
+    pub written_forms: Vec<WrittenForm>,
     /// Readings, in entry order.
     pub readings: Vec<Reading>,
     /// Senses, in entry order.
@@ -77,7 +77,7 @@ pub struct Entry {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct KanjiForm {
+pub struct WrittenForm {
     /// `<keb>` text.
     pub text: String,
     /// `<ke_inf>` tags.
@@ -90,7 +90,7 @@ pub struct Reading {
     pub text: String,
     /// True if the element holds `<re_nokanji/>`.
     pub no_kanji: bool,
-    /// `<re_restr>` texts: the kanji forms that the reading applies to.
+    /// `<re_restr>` texts: the written forms that the reading applies to.
     pub restrictions: Vec<String>,
     /// `<re_inf>` tags.
     pub tags: Vec<String>,
@@ -98,7 +98,7 @@ pub struct Reading {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Sense {
-    /// `<stagk>` texts: the kanji forms that the sense applies to.
+    /// `<stagk>` texts: the written forms that the sense applies to.
     pub kanji_restrictions: Vec<String>,
     /// `<stagr>` texts: the readings that the sense applies to.
     pub reading_restrictions: Vec<String>,
@@ -201,12 +201,12 @@ pub fn parse(input: Source) -> Result<Jmdict> {
                             })?
                         }
                         "keb" => {
-                            if let Some(k) = e.kanji.last_mut() {
+                            if let Some(k) = e.written_forms.last_mut() {
                                 k.text = value.to_owned();
                             }
                         }
                         "ke_inf" => {
-                            if let Some(k) = e.kanji.last_mut() {
+                            if let Some(k) = e.written_forms.last_mut() {
                                 k.tags.push(tag());
                             }
                         }
@@ -279,10 +279,10 @@ pub fn parse(input: Source) -> Result<Jmdict> {
     Ok(result)
 }
 
-/// Adds the kanji form, reading, or sense that the element `name` starts.
+/// Adds the written form, reading, or sense that the element `name` starts.
 fn open_element(entry: &mut Entry, name: &str) {
     match name {
-        "k_ele" => entry.kanji.push(KanjiForm::default()),
+        "k_ele" => entry.written_forms.push(WrittenForm::default()),
         "r_ele" => entry.readings.push(Reading::default()),
         "sense" => entry.senses.push(Sense::default()),
         _ => {}
@@ -367,12 +367,12 @@ mod tests {
     fn chotto_expected() -> Entry {
         Entry {
             seq: 1234560,
-            kanji: vec![
-                KanjiForm {
+            written_forms: vec![
+                WrittenForm {
                     text: "一寸".into(),
                     tags: vec!["ateji".into()],
                 },
-                KanjiForm {
+                WrittenForm {
                     text: "鳥渡".into(),
                     tags: vec!["ateji".into(), "iK".into()],
                 },
@@ -407,12 +407,12 @@ mod tests {
     }
 
     #[test]
-    fn entry_without_kanji_forms() {
+    fn entry_without_written_forms() {
         let e = entries(
             "<entry><ent_seq>2</ent_seq><r_ele><reb>ちょっと</reb></r_ele><sense/></entry>",
         );
         assert_eq!(e[0].seq, 2);
-        assert!(e[0].kanji.is_empty());
+        assert!(e[0].written_forms.is_empty());
         assert_eq!(e[0].senses.len(), 1);
     }
 
@@ -458,7 +458,10 @@ mod tests {
             "<entry><ent_seq>5</ent_seq><k_ele><keb>一寸</keb><ke_inf>&newtag;</ke_inf></k_ele></entry>",
         )
         .unwrap();
-        assert_eq!(jmdict.entries[0].kanji[0].tags, vec!["newtag".to_owned()]);
+        assert_eq!(
+            jmdict.entries[0].written_forms[0].tags,
+            vec!["newtag".to_owned()]
+        );
         assert!(!jmdict.entities.contains_key("newtag"));
     }
 

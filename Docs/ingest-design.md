@@ -7,14 +7,14 @@ database of the app, from free public data sources.
 
 `content.db` holds a graph of words and characters. The graph has 3 kinds of link:
 
-- A kanji form of a word links to its kanji. 語学 links to 語 and 学.
+- A written form of a word links to its kanji. 語学 links to 語 and 学.
 - A character links to its direct components. 語 links to 言 and 吾. 吾 links to 五 and 口.
 - A mutant links to its base. 亻 is the form of 人 on the left side of a kanji, so 亻 links
   to 人.
 
 The `ingest` crate builds the graph in stages.
 
-1. *JMdict* gives the words, with their kanji forms, readings, senses, glosses, and tags.
+1. *JMdict* gives the words, with their written forms, readings, senses, glosses, and tags.
 2. *KanjiVG* gives the component tree of each character.
 3. `data/mutants.tsv`, a list in this repository, gives the mutant mapping.
 4. Graph is written from memory into `content.db`.
@@ -28,7 +28,7 @@ The graph:
 | Table | Content |
 | --- | --- |
 | `word` | 1 row for each JMdict entry |
-| `kanji_form_kanji` | Kanji of each kanji form |
+| `written_form_kanji` | Kanji of each written form |
 | `character` | Each character that the other tables refer to |
 | `character_component` | Direct components of each character |
 | `mutant` | Base of each mutant |
@@ -37,12 +37,12 @@ The structure of each JMdict entry:
 
 | Table | Content |
 | --- | --- |
-| `kanji_form` | 1 row for each `<k_ele>` |
+| `written_form` | 1 row for each `<k_ele>` |
 | `reading` | 1 row for each `<r_ele>` |
-| `reading_restriction` | Kanji forms that a reading applies to (`<re_restr>`) |
+| `reading_restriction` | Written forms that a reading applies to (`<re_restr>`) |
 | `sense` | 1 row for each `<sense>`, with its note (`<s_inf>`) |
 | `gloss` | English glosses of each sense (`<gloss>`) |
-| `sense_kanji_form` | Kanji forms that a sense applies to (`<stagk>`) |
+| `sense_written_form` | Written forms that a sense applies to (`<stagk>`) |
 | `sense_reading` | Readings that a sense applies to (`<stagr>`) |
 
 The JMdict tags:
@@ -50,7 +50,7 @@ The JMdict tags:
 | Table | Content |
 | --- | --- |
 | `tag` | 1 row for each tag, with its category and its description |
-| `kanji_form_tag` | `<ke_inf>` tags of each kanji form |
+| `written_form_tag` | `<ke_inf>` tags of each written form |
 | `reading_tag` | `<re_inf>` tags of each reading |
 | `sense_tag` | `<pos>`, `<field>`, `<misc>`, and `<dial>` tags of each sense |
 
@@ -74,7 +74,7 @@ Later designs add these items:
 | --- | --- |
 | Character | 1 code point after normalization. `character.id` is the code point. |
 | Normalization | Function `jpdag::normalize`, which the pipeline applies to each code point from a source (section 6.1) |
-| Kanji form | A written form of a JMdict entry with kanji. Each `<keb>` element gives 1 kanji form. |
+| Written form | A spelling of a JMdict entry that is not kana alone. Each `<keb>` element gives 1 written form. Most written forms contain kanji, but some do not, for example ＵＦＯ and ビタミンＢ６. |
 | Reading | A written form of a JMdict entry in kana. Each `<reb>` element gives 1 reading. |
 | Sense | 1 meaning of a JMdict entry. Each `<sense>` element gives 1 sense. |
 | Gloss | An English word or phrase for 1 sense, for example "a little". Each `<gloss>` element gives 1 gloss. A sense has 0 or more glosses. |
@@ -92,7 +92,7 @@ Later designs add these items:
 
 | Source | File | Publisher | Licence | Use |
 | --- | --- | --- | --- | --- |
-| JMdict | `JMdict_e.gz` | EDRDG | CC BY-SA 4.0 | Entries, kanji forms, readings, senses, and tags |
+| JMdict | `JMdict_e.gz` | EDRDG | CC BY-SA 4.0 | Entries, written forms, readings, senses, and tags |
 | KanjiVG | `kanjivg-YYYYMMDD.xml.gz`, from the GitHub release | KanjiVG project | CC BY-SA 3.0 | Components of each character |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
@@ -128,10 +128,10 @@ CREATE TABLE character_component (
   PRIMARY KEY (character_id, component_id)
 ) STRICT, WITHOUT ROWID;
 
-CREATE TABLE kanji_form_kanji (
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
+CREATE TABLE written_form_kanji (
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
   kanji_id      INTEGER NOT NULL REFERENCES character(id),
-  PRIMARY KEY (kanji_form_id, kanji_id)
+  PRIMARY KEY (written_form_id, kanji_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE mutant (
@@ -140,7 +140,7 @@ CREATE TABLE mutant (
   PRIMARY KEY (mutant_id, base_id)
 ) STRICT, WITHOUT ROWID;
 
-CREATE TABLE kanji_form (
+CREATE TABLE written_form (
   id       INTEGER PRIMARY KEY,
   word_id  INTEGER NOT NULL REFERENCES word(id),
   position INTEGER NOT NULL,
@@ -159,8 +159,8 @@ CREATE TABLE reading (
 
 CREATE TABLE reading_restriction (
   reading_id    INTEGER NOT NULL REFERENCES reading(id),
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
-  PRIMARY KEY (reading_id, kanji_form_id)
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
+  PRIMARY KEY (reading_id, written_form_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE sense (
@@ -179,10 +179,10 @@ CREATE TABLE gloss (
   PRIMARY KEY (sense_id, position)
 ) STRICT, WITHOUT ROWID;
 
-CREATE TABLE sense_kanji_form (
+CREATE TABLE sense_written_form (
   sense_id      INTEGER NOT NULL REFERENCES sense(id),
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
-  PRIMARY KEY (sense_id, kanji_form_id)
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
+  PRIMARY KEY (sense_id, written_form_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE sense_reading (
@@ -199,10 +199,10 @@ CREATE TABLE tag (
   UNIQUE (category, name)
 ) STRICT;
 
-CREATE TABLE kanji_form_tag (
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
+CREATE TABLE written_form_tag (
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
   tag_id        INTEGER NOT NULL REFERENCES tag(id),
-  PRIMARY KEY (kanji_form_id, tag_id)
+  PRIMARY KEY (written_form_id, tag_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE reading_tag (
@@ -224,23 +224,23 @@ CREATE TABLE source (
   attribution TEXT NOT NULL
 ) STRICT;
 
-CREATE INDEX kanji_form_text                  ON kanji_form(text);
+CREATE INDEX written_form_text                  ON written_form(text);
 CREATE INDEX reading_text                     ON reading(text);
-CREATE INDEX kanji_form_kanji_kanji_id        ON kanji_form_kanji(kanji_id);
+CREATE INDEX written_form_kanji_kanji_id        ON written_form_kanji(kanji_id);
 CREATE INDEX character_component_component_id ON character_component(component_id);
 CREATE INDEX mutant_base_id                   ON mutant(base_id);
-CREATE INDEX kanji_form_tag_tag_id            ON kanji_form_tag(tag_id);
+CREATE INDEX written_form_tag_tag_id            ON written_form_tag(tag_id);
 CREATE INDEX reading_tag_tag_id               ON reading_tag(tag_id);
 CREATE INDEX sense_tag_tag_id                 ON sense_tag(tag_id);
 ```
 
 The primary key of a table serves lookups in the direction of its first column. The indexes serve
 the other direction: a word by its written form, the words that use a kanji, the characters that
-contain a component, the mutants of a base, and the kanji forms, readings, or senses with a tag.
+contain a component, the mutants of a base, and the written forms, readings, or senses with a tag.
 
 `word` is represented by its JMdict `ent_seq`, and `character` is its code point.
 
-Stage 2 gives the ids of `kanji_form`, `reading`, `sense`, and `tag` in the order of the word id and
+Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
 the position, so 2 builds from the same files give the same ids. The ids change when JMdict changes.
 For a reference that lasts across builds, the app must store the word id and the position, not the
 id.
@@ -277,8 +277,8 @@ so they stay 2 characters, and `mutant` links them.
 
 | Stage | Input | Output |
 | --- | --- | --- |
-| 1. Parse JMdict | `JMdict_e.gz` | Each entry, with its kanji forms, readings, senses, and tags |
-| 2. Build the word rows | Stage 1 | Rows of `word`, `kanji_form_kanji`, the entry tables, and the tag tables |
+| 1. Parse JMdict | `JMdict_e.gz` | Each entry, with its written forms, readings, senses, and tags |
+| 2. Build the word rows | Stage 1 | Rows of `word`, `written_form_kanji`, the entry tables, and the tag tables |
 | 3. Parse KanjiVG | `kanjivg-*.xml.gz` | Direct components of each KanjiVG entry |
 | 4. Read the mutants | `data/mutants.tsv`, and the KanjiVG components of stage 3 | Candidate `mutant` rows |
 | 5. Complete the character set | Stages 2, 3, and 4 | `character`, `character_component`, and `mutant` rows |
@@ -323,7 +323,7 @@ The result can have more than 1 code point. For example, normalization gives 平
    Keep the text of each `<s_inf>`.
 7. Discard all other elements.
 
-Stage 1 keeps the kanji forms, readings, senses, and glosses of an entry in file order.
+Stage 1 keeps the written forms, readings, senses, and glosses of an entry in file order.
 Later designs read the elements that step 7 discards, for example `<lsource>`.
 
 JMdict writes each tag as an entity reference, for example `&uk;`. The document type definition (DTD)
@@ -344,18 +344,18 @@ Stage 2 turns each entry of stage 1 into rows. Each JMdict entry gives 1 `word` 
 
 #### Entry rows
 
-1. For each kanji form of the entry, add 1 `kanji_form` row with its position.
+1. For each written form of the entry, add 1 `written_form` row with its position.
 2. For each reading of the entry, add 1 `reading` row with its position.
 3. For each sense of the entry, add 1 `sense` row with its position and its note.
 4. For each gloss of a sense, add 1 `gloss` row with its position in the sense and its `g_type`
    value.
 5. For each `<re_restr>` text, add 1 `reading_restriction` row. The row links the reading to the
-   kanji form of the same entry with that text.
-6. For each `<stagk>` text, add 1 `sense_kanji_form` row in the same way.
+   written form of the same entry with that text.
+6. For each `<stagk>` text, add 1 `sense_written_form` row in the same way.
 7. For each `<stagr>` text, add 1 `sense_reading` row in the same way.
 8. If a `<re_restr>`, `<stagk>`, or `<stagr>` text names no form of its entry, skip the restriction.
 9. If a sense has no `<pos>` tag, give the sense the `<pos>` tags of the previous sense.
-10. For each tag, add 1 `kanji_form_tag`, `reading_tag`, or `sense_tag` row.
+10. For each tag, add 1 `written_form_tag`, `reading_tag`, or `sense_tag` row.
 
 The `g_type` value marks a gloss that is not a plain translation: `lit` (literal), `fig`
 (figurative), `expl` (an explanation), or `tm` (a trademark). Most glosses have no `g_type`, so
@@ -377,17 +377,18 @@ rows.
 
 #### Kanji links
 
-The `kanji_form_kanji` rows link each kanji form to its kanji. For each kanji form, do these steps:
+The `written_form_kanji` rows link each written form to its kanji. For each written form, do these steps:
 
-1. Normalize each code point of the kanji form.
+1. Normalize each code point of the written form.
 2. Keep each code point with the Unicode property `Unified_Ideograph`.
 3. Remove duplicate code points.
-4. Add 1 `kanji_form_kanji` row for each code point in the result.
+4. Add 1 `written_form_kanji` row for each code point in the result.
 
-Stage 2 links every kanji form, including a form with the tag `iK`, `oK`, `rK`, or `sK`, and the
+A written form without kanji, for example ＵＦＯ, gets no `written_form_kanji` rows. Stage 2 links
+every other written form, including a form with the tag `iK`, `oK`, `rK`, or `sK`, and the
 forms of a word whose senses have the tag `uk`. So ちょっと links to 鳥 and 渡 through its rare form 鳥渡. A
-query that needs only the usual written forms filters the kanji forms. For example, the query can
-take only the kanji form at position 1, exclude the forms with those 4 tags in `kanji_form_tag`, or
+query that needs only the usual written forms filters the written forms. For example, the query can
+take only the written form at position 1, exclude the forms with those 4 tags in `written_form_tag`, or
 exclude the words whose first sense has `uk` in `sense_tag`. JMdict almost always lists the usual kanji
 form first.
 
@@ -395,7 +396,7 @@ Step 2 removes kana, Latin letters, and marks. 々, 〆, and ヶ have no `Unifie
 人々 gives only 人, and 〆切 gives only 切. The ranges of the property come from
 `PropList-18.0.0.txt`.
 
-| Kanji form | `kanji_form_kanji` rows |
+| Written form | `written_form_kanji` rows |
 | --- | --- |
 | 取り扱い | 取, 扱 |
 | 一ヶ月 | 一, 月 |
@@ -589,7 +590,7 @@ cargo test -p ingest --test build_checks -- --ignored
 | `one_word_for_each_jmdict_entry` | Number of `word` rows equals the number of JMdict entries |
 | `components_make_no_cycle` | `character_component` rows make no cycle |
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
-| `one_row_for_each_jmdict_element` | Numbers of `kanji_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
+| `one_row_for_each_jmdict_element` | Numbers of `written_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
 | `sources_have_versions` | `source` holds JMdict, KanjiVG, and Kanji alive, and the rows of JMdict and KanjiVG have a version |
 
@@ -629,9 +630,9 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `keeps_the_parts_of_an_entry_in_order` | An entry with 2 kanji forms, each with tags | `ent_seq`, the 2 kanji forms in order, and the tags of each kanji form |
+| `keeps_the_parts_of_an_entry_in_order` | An entry with 2 written forms, each with tags | `ent_seq`, the 2 written forms in order, and the tags of each written form |
 | `entity_reference_gives_its_name_as_the_tag` | `<misc>&uk;</misc>` in the first sense | Tag `uk`, not the DTD text |
-| `entry_without_kanji_forms` | An entry with no `<k_ele>` | An empty list of kanji forms |
+| `entry_without_written_forms` | An entry with no `<k_ele>` | An empty list of written forms |
 | `tag_belongs_to_its_own_sense` | `uk` in the second sense only | Tag `uk` on the second sense only |
 | `reads_gzip_input` | Entry of `keeps_the_parts_of_an_entry_in_order`, compressed with gzip | Same result |
 | `unclosed_element_error_gives_the_line` | XML with an unclosed element | An error that gives the line number |
@@ -648,10 +649,10 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `ids_follow_the_word_id_and_the_position` | 2 entries, each with 2 kanji forms, 2 readings, and 2 senses | Rows in order of word id and position, with the positions 1 and 2 |
-| `reading_restriction_links_the_named_kanji_form` | A reading whose `<re_restr>` names the second kanji form | 1 `reading_restriction` row to the second kanji form |
-| `sense_restrictions_link_the_named_forms` | A sense with 1 `<stagk>` and 1 `<stagr>` | 1 `sense_kanji_form` row and 1 `sense_reading` row |
-| `restriction_that_names_no_form_is_skipped` | A `<re_restr>` text that names no kanji form of the entry | No `reading_restriction` row, and the build report lists the restriction with the `ent_seq` |
+| `ids_follow_the_word_id_and_the_position` | 2 entries, each with 2 written forms, 2 readings, and 2 senses | Rows in order of word id and position, with the positions 1 and 2 |
+| `reading_restriction_links_the_named_written_form` | A reading whose `<re_restr>` names the second written form | 1 `reading_restriction` row to the second written form |
+| `sense_restrictions_link_the_named_forms` | A sense with 1 `<stagk>` and 1 `<stagr>` | 1 `sense_written_form` row and 1 `sense_reading` row |
+| `restriction_that_names_no_form_is_skipped` | A `<re_restr>` text that names no written form of the entry | No `reading_restriction` row, and the build report lists the restriction with the `ent_seq` |
 | `sense_without_pos_takes_the_previous_pos` | A second sense with no `<pos>` | `sense_tag` rows of the second sense hold the `<pos>` tags of the first sense |
 | `same_name_in_two_categories_gives_two_tags` | Name `ik` in a `<ke_inf>` and in a `<re_inf>` | 2 `tag` rows, with the categories `ke_inf` and `re_inf` |
 | `undeclared_entity_gives_a_tag_without_description` | An entity that the DTD does not declare | A `tag` row with no description, and the build report lists the tag |
@@ -662,18 +663,18 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `each_kanji_form_links_to_its_kanji` | Kanji forms 一寸 and 鳥渡 | 一 and 寸 link to 一寸, and 鳥 and 渡 link to 鳥渡 |
-| `tags_do_not_filter_the_links` | A kanji form with the tag `rK` | Kanji of the form. Tags do not filter the links. |
-| `uk_does_not_filter_the_links` | A word with `uk` in the first sense | Kanji of each kanji form. `uk` does not filter the links. |
+| `each_written_form_links_to_its_kanji` | Written forms 一寸 and 鳥渡 | 一 and 寸 link to 一寸, and 鳥 and 渡 link to 鳥渡 |
+| `tags_do_not_filter_the_links` | A written form with the tag `rK` | Kanji of the form. Tags do not filter the links. |
+| `uk_does_not_filter_the_links` | A word with `uk` in the first sense | Kanji of each written form. `uk` does not filter the links. |
 | `iteration_mark_is_not_a_kanji` | 人々 | 人 |
 | `small_ke_is_not_a_kanji` | 一ヶ月 | 一, 月 |
 | `okurigana_are_not_kanji` | 取り扱い | 取, 扱 |
-| `form_without_kanji_gives_no_links` | Tシャツ | No `kanji_form_kanji` rows |
+| `form_without_kanji_gives_no_links` | Tシャツ | No `written_form_kanji` rows |
 | `shime_mark_is_not_a_kanji` | 〆切 | 切 |
 | `kanji_of_a_supplementary_plane` | 𠮟る (U+20B9F) | U+20B9F |
 | `compatibility_ideograph_links_its_unified_ideograph` | U+FA19, a compatibility ideograph | U+795E (神) |
 | `unified_ideograph_in_the_compatibility_block_is_kept` | 﨑 (U+FA11), a unified ideograph in the compatibility block | U+FA11 |
-| `repeated_kanji_links_once` | A kanji form with the same kanji 2 times | 1 `kanji_form_kanji` row |
+| `repeated_kanji_links_once` | A written form with the same kanji 2 times | 1 `written_form_kanji` row |
 
 ### `kanjivg.rs`
 
@@ -722,7 +723,7 @@ Each row gives the name of the test function of the case.
 | --- | --- | --- |
 | `empty_build_creates_the_schema` | A build with no rows | 17 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
 | `rows_round_trip` | A small set of rows | Same rows in each table |
-| `foreign_key_violation_fails_the_build` | A `kanji_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
+| `foreign_key_violation_fails_the_build` | A `written_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
 | `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
 
 ### Integration test (`tests/pipeline.rs`)

@@ -76,7 +76,7 @@ fn run(args: &Args) -> Result<String> {
 
     // Stage 2.
     let entries = words::build(&jmdict);
-    let kanji_links = kanji_links::link(&entries.kanji_forms);
+    let kanji_links = kanji_links::link(&entries.written_forms);
 
     // Stage 3.
     let kvg = kanjivg::parse(source::open_path(&args.kanjivg)?)?;
@@ -93,7 +93,7 @@ fn run(args: &Args) -> Result<String> {
     let pair = |&(a, b): &(char, char)| (a as u32, b as u32);
     let rows = db::Rows {
         entries,
-        kanji_form_kanji: kanji_links.iter().map(|&(id, k)| (id, k as u32)).collect(),
+        written_form_kanji: kanji_links.iter().map(|&(id, k)| (id, k as u32)).collect(),
         characters: set.characters.iter().map(|&c| c as u32).collect(),
         character_components: set.character_components.iter().map(pair).collect(),
         mutants: set.mutants.iter().map(pair).collect(),

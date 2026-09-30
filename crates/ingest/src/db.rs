@@ -23,8 +23,8 @@ pub struct Source {
 pub struct Rows {
     /// Rows of `word`, the entry tables, and the tag tables.
     pub entries: EntryRows,
-    /// Each row as (kanji_form_id, kanji_id).
-    pub kanji_form_kanji: Vec<(u32, u32)>,
+    /// Each row as (written_form_id, kanji_id).
+    pub written_form_kanji: Vec<(u32, u32)>,
     pub characters: Vec<u32>,
     /// Each row as (character_id, component_id).
     pub character_components: Vec<(u32, u32)>,
@@ -41,17 +41,17 @@ impl Rows {
             ("word", e.words.len()),
             ("character", self.characters.len()),
             ("character_component", self.character_components.len()),
-            ("kanji_form_kanji", self.kanji_form_kanji.len()),
+            ("written_form_kanji", self.written_form_kanji.len()),
             ("mutant", self.mutants.len()),
-            ("kanji_form", e.kanji_forms.len()),
+            ("written_form", e.written_forms.len()),
             ("reading", e.readings.len()),
             ("reading_restriction", e.reading_restrictions.len()),
             ("sense", e.senses.len()),
             ("gloss", e.glosses.len()),
-            ("sense_kanji_form", e.sense_kanji_forms.len()),
+            ("sense_written_form", e.sense_written_forms.len()),
             ("sense_reading", e.sense_readings.len()),
             ("tag", e.tags.len()),
-            ("kanji_form_tag", e.kanji_form_tags.len()),
+            ("written_form_tag", e.written_form_tags.len()),
             ("reading_tag", e.reading_tags.len()),
             ("sense_tag", e.sense_tags.len()),
             ("source", self.sources.len()),
@@ -100,8 +100,8 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     for id in &rows.characters {
         insert.execute([id])?;
     }
-    let mut insert = tx.prepare("INSERT INTO kanji_form VALUES (?1, ?2, ?3, ?4)")?;
-    for k in &e.kanji_forms {
+    let mut insert = tx.prepare("INSERT INTO written_form VALUES (?1, ?2, ?3, ?4)")?;
+    for k in &e.written_forms {
         insert.execute(params![k.id, k.word_id, k.position, k.text])?;
     }
     let mut insert = tx.prepare("INSERT INTO reading VALUES (?1, ?2, ?3, ?4, ?5)")?;
@@ -126,12 +126,12 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     }
     for (table, pairs) in [
         ("character_component", &rows.character_components),
-        ("kanji_form_kanji", &rows.kanji_form_kanji),
+        ("written_form_kanji", &rows.written_form_kanji),
         ("mutant", &rows.mutants),
         ("reading_restriction", &e.reading_restrictions),
-        ("sense_kanji_form", &e.sense_kanji_forms),
+        ("sense_written_form", &e.sense_written_forms),
         ("sense_reading", &e.sense_readings),
-        ("kanji_form_tag", &e.kanji_form_tags),
+        ("written_form_tag", &e.written_form_tags),
         ("reading_tag", &e.reading_tags),
         ("sense_tag", &e.sense_tags),
     ] {
@@ -179,7 +179,7 @@ fn write_tmp(tmp: &Path, rows: &Rows) -> Result<()> {
 mod tests {
     use super::*;
     use crate::jmdict::Category;
-    use crate::words::{GlossRow, KanjiFormRow, ReadingRow, SenseRow, TagRow};
+    use crate::words::{GlossRow, ReadingRow, SenseRow, TagRow, WrittenFormRow};
 
     fn out_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("ingest-db-{name}-{}", std::process::id()));
@@ -219,7 +219,7 @@ mod tests {
         Rows {
             entries: EntryRows {
                 words: vec![1000, 1001],
-                kanji_forms: vec![KanjiFormRow {
+                written_forms: vec![WrittenFormRow {
                     id: 1,
                     word_id: 1000,
                     position: 1,
@@ -245,7 +245,7 @@ mod tests {
                     text: "to rest".into(),
                     g_type: None,
                 }],
-                sense_kanji_forms: vec![(1, 1)],
+                sense_written_forms: vec![(1, 1)],
                 sense_readings: vec![(1, 1)],
                 tags: vec![TagRow {
                     id: 1,
@@ -253,12 +253,12 @@ mod tests {
                     name: "v5m".into(),
                     description: None,
                 }],
-                kanji_form_tags: vec![(1, 1)],
+                written_form_tags: vec![(1, 1)],
                 reading_tags: vec![(1, 1)],
                 sense_tags: vec![(1, 1)],
                 skipped_restrictions: vec![],
             },
-            kanji_form_kanji: vec![(1, 0x4F11)],
+            written_form_kanji: vec![(1, 0x4F11)],
             characters: vec![0x4EBA, 0x4EBB, 0x4F11, 0x6728],
             character_components: vec![(0x4F11, 0x4EBB), (0x4F11, 0x6728)],
             mutants: vec![(0x4EBB, 0x4EBA)],
@@ -302,7 +302,7 @@ mod tests {
                 .unwrap();
             assert_eq!(n as usize, count, "{table}");
         }
-        assert_eq!(strings(&conn, "SELECT text FROM kanji_form"), ["休む"]);
+        assert_eq!(strings(&conn, "SELECT text FROM written_form"), ["休む"]);
         assert_eq!(strings(&conn, "SELECT note FROM sense"), ["a note"]);
         assert_eq!(strings(&conn, "SELECT category FROM tag"), ["pos"]);
         assert_eq!(strings(&conn, "SELECT version FROM source"), ["2026-09-28"]);
@@ -312,7 +312,7 @@ mod tests {
     fn foreign_key_violation_fails_the_build() {
         let dir = out_dir("d3");
         let mut rows = small_rows();
-        rows.kanji_form_kanji.push((1, 0x8A9E));
+        rows.written_form_kanji.push((1, 0x8A9E));
         let error = write(&dir, &rows).unwrap_err().to_string();
         assert!(error.contains("foreign key"), "{error}");
         assert!(!dir.join("content.db").exists());
@@ -326,7 +326,7 @@ mod tests {
         let previous = fs::read(dir.join("content.db")).unwrap();
 
         let mut rows = small_rows();
-        rows.kanji_form_kanji.push((1, 0x8A9E));
+        rows.written_form_kanji.push((1, 0x8A9E));
         assert!(write(&dir, &rows).is_err());
         assert_eq!(fs::read(dir.join("content.db")).unwrap(), previous);
         assert!(!dir.join("content.db.tmp").exists());

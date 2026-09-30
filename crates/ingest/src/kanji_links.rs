@@ -1,8 +1,8 @@
-//! Stage 2: link each kanji form to its kanji.
+//! Stage 2: link each written form to its kanji.
 
 use jpdag::normalize::normalize;
 
-use crate::words::KanjiFormRow;
+use crate::words::WrittenFormRow;
 
 /// Code points with the Unicode property `Unified_Ideograph`, from `PropList-18.0.0.txt`.
 const UNIFIED_IDEOGRAPH: [(u32, u32); 16] = [
@@ -46,10 +46,10 @@ pub fn kanji_of(text: &str) -> Vec<char> {
     kanji
 }
 
-/// `kanji_form_kanji` rows, each as (kanji_form_id, kanji). Tags and `uk` do not filter the
+/// `written_form_kanji` rows, each as (written_form_id, kanji). Tags and `uk` do not filter the
 /// links.
-pub fn link(kanji_forms: &[KanjiFormRow]) -> Vec<(u32, char)> {
-    kanji_forms
+pub fn link(written_forms: &[WrittenFormRow]) -> Vec<(u32, char)> {
+    written_forms
         .iter()
         .flat_map(|k| kanji_of(&k.text).into_iter().map(move |c| (k.id, c)))
         .collect()
@@ -58,15 +58,15 @@ pub fn link(kanji_forms: &[KanjiFormRow]) -> Vec<(u32, char)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jmdict::{Category, Entry, Jmdict, KanjiForm, Sense};
+    use crate::jmdict::{Category, Entry, Jmdict, Sense, WrittenForm};
     use crate::words;
 
     fn links(forms: &[(&str, &[&str])], sense_tags: &[(Category, &str)]) -> Vec<(u32, char)> {
         let entry = Entry {
             seq: 1,
-            kanji: forms
+            written_forms: forms
                 .iter()
-                .map(|(text, tags)| KanjiForm {
+                .map(|(text, tags)| WrittenForm {
                     text: (*text).into(),
                     tags: tags.iter().map(|t| (*t).into()).collect(),
                 })
@@ -81,11 +81,11 @@ mod tests {
             entries: vec![entry],
             ..Jmdict::default()
         };
-        link(&words::build(&jmdict).kanji_forms)
+        link(&words::build(&jmdict).written_forms)
     }
 
     #[test]
-    fn each_kanji_form_links_to_its_kanji() {
+    fn each_written_form_links_to_its_kanji() {
         assert_eq!(
             links(&[("一寸", &[]), ("鳥渡", &[])], &[]),
             vec![(1, '一'), (1, '寸'), (2, '鳥'), (2, '渡')]

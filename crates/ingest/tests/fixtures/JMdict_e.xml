@@ -13,7 +13,7 @@
 ]>
 <!-- JMdict created: 2026-09-28 -->
 <JMdict>
-<!-- 2 kanji forms, 1 with rK. -->
+<!-- 2 written forms, 1 with rK. -->
 <entry><ent_seq>1000010</ent_seq>
 <k_ele><keb>正</keb></k_ele>
 <k_ele><keb>誤</keb><ke_inf>&rK;</ke_inf></k_ele>
@@ -51,7 +51,7 @@
 <entry><ent_seq>1000190</ent_seq><k_ele><keb>点</keb></k_ele><sense><gloss>point</gloss></sense></entry>
 <entry><ent_seq>1000200</ent_seq><k_ele><keb>飯</keb></k_ele><sense><gloss>meal</gloss></sense></entry>
 <entry><ent_seq>1000210</ent_seq><k_ele><keb>每</keb></k_ele><sense><gloss>every</gloss></sense></entry>
-<!-- An entry with no kanji form. -->
+<!-- An entry with no written form. -->
 <entry><ent_seq>1000410</ent_seq><r_ele><reb>ちょっと</reb></r_ele><sense><gloss>a little</gloss></sense></entry>
 <!-- The structure of an entry: forms, restrictions, tags, glosses, and notes. -->
 <entry><ent_seq>1000500</ent_seq>
@@ -66,7 +66,7 @@
 <sense><pos>&int;</pos><s_inf>first note</s_inf><s_inf>second note</s_inf><gloss>hey!</gloss></sense>
 <sense><xref>ちょっと</xref></sense>
 </entry>
-<!-- A second entry with 2 kanji forms, 2 readings, and 2 senses. -->
+<!-- A second entry with 2 written forms, 2 readings, and 2 senses. -->
 <entry><ent_seq>1000510</ent_seq>
 <k_ele><keb>明日</keb></k_ele><k_ele><keb>翌日</keb><ke_inf>&iK;</ke_inf></k_ele>
 <r_ele><reb>あした</reb></r_ele><r_ele><reb>あす</reb></r_ele>

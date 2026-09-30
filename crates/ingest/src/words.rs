@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use crate::jmdict::{Category, Entry, Jmdict};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KanjiFormRow {
+pub struct WrittenFormRow {
     pub id: u32,
     pub word_id: u32,
     pub position: u32,
@@ -58,19 +58,19 @@ pub struct SkippedRestriction {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct EntryRows {
     pub words: Vec<u32>,
-    pub kanji_forms: Vec<KanjiFormRow>,
+    pub written_forms: Vec<WrittenFormRow>,
     pub readings: Vec<ReadingRow>,
-    /// Each row as (reading_id, kanji_form_id).
+    /// Each row as (reading_id, written_form_id).
     pub reading_restrictions: Vec<(u32, u32)>,
     pub senses: Vec<SenseRow>,
     pub glosses: Vec<GlossRow>,
-    /// Each row as (sense_id, kanji_form_id).
-    pub sense_kanji_forms: Vec<(u32, u32)>,
+    /// Each row as (sense_id, written_form_id).
+    pub sense_written_forms: Vec<(u32, u32)>,
     /// Each row as (sense_id, reading_id).
     pub sense_readings: Vec<(u32, u32)>,
     pub tags: Vec<TagRow>,
-    /// Each row as (kanji_form_id, tag_id).
-    pub kanji_form_tags: Vec<(u32, u32)>,
+    /// Each row as (written_form_id, tag_id).
+    pub written_form_tags: Vec<(u32, u32)>,
     /// Each row as (reading_id, tag_id).
     pub reading_tags: Vec<(u32, u32)>,
     /// Each row as (sense_id, tag_id).
@@ -105,9 +105,9 @@ struct Builder<'a> {
     rows: EntryRows,
     tag_ids: HashMap<(Category, String), u32>,
     reading_restrictions: Links,
-    sense_kanji_forms: Links,
+    sense_written_forms: Links,
     sense_readings: Links,
-    kanji_form_tags: Links,
+    written_form_tags: Links,
     reading_tags: Links,
     sense_tags: Links,
 }
@@ -143,9 +143,9 @@ impl Builder<'_> {
 
         // Steps 1 and 2. The first form with a text answers a restriction with that text.
         let mut kanji_ids: HashMap<&str, u32> = HashMap::new();
-        for (i, k) in entry.kanji.iter().enumerate() {
-            let id = self.rows.kanji_forms.len() as u32 + 1;
-            self.rows.kanji_forms.push(KanjiFormRow {
+        for (i, k) in entry.written_forms.iter().enumerate() {
+            let id = self.rows.written_forms.len() as u32 + 1;
+            self.rows.written_forms.push(WrittenFormRow {
                 id,
                 word_id: seq,
                 position: i as u32 + 1,
@@ -154,7 +154,7 @@ impl Builder<'_> {
             kanji_ids.entry(&k.text).or_insert(id);
             for tag in &k.tags {
                 let tag_id = self.tag_id(Category::KeInf, tag);
-                self.kanji_form_tags.add((id, tag_id));
+                self.written_form_tags.add((id, tag_id));
             }
         }
         let mut reading_ids: HashMap<&str, u32> = HashMap::new();
@@ -175,7 +175,7 @@ impl Builder<'_> {
             // Steps 5 and 8.
             for text in &r.restrictions {
                 match kanji_ids.get(text.as_str()) {
-                    Some(&kanji_form_id) => self.reading_restrictions.add((id, kanji_form_id)),
+                    Some(&written_form_id) => self.reading_restrictions.add((id, written_form_id)),
                     None => self.skip(seq, "re_restr", text),
                 }
             }
@@ -203,7 +203,7 @@ impl Builder<'_> {
             // Steps 6, 7, and 8.
             for text in &s.kanji_restrictions {
                 match kanji_ids.get(text.as_str()) {
-                    Some(&kanji_form_id) => self.sense_kanji_forms.add((id, kanji_form_id)),
+                    Some(&written_form_id) => self.sense_written_forms.add((id, written_form_id)),
                     None => self.skip(seq, "stagk", text),
                 }
             }
@@ -237,9 +237,9 @@ impl Builder<'_> {
 
     fn finish(mut self) -> EntryRows {
         self.rows.reading_restrictions = self.reading_restrictions.rows;
-        self.rows.sense_kanji_forms = self.sense_kanji_forms.rows;
+        self.rows.sense_written_forms = self.sense_written_forms.rows;
         self.rows.sense_readings = self.sense_readings.rows;
-        self.rows.kanji_form_tags = self.kanji_form_tags.rows;
+        self.rows.written_form_tags = self.written_form_tags.rows;
         self.rows.reading_tags = self.reading_tags.rows;
         self.rows.sense_tags = self.sense_tags.rows;
         self.rows
@@ -255,9 +255,9 @@ pub fn build(jmdict: &Jmdict) -> EntryRows {
         rows: EntryRows::default(),
         tag_ids: HashMap::new(),
         reading_restrictions: Links::default(),
-        sense_kanji_forms: Links::default(),
+        sense_written_forms: Links::default(),
         sense_readings: Links::default(),
-        kanji_form_tags: Links::default(),
+        written_form_tags: Links::default(),
         reading_tags: Links::default(),
         sense_tags: Links::default(),
     };
@@ -270,10 +270,10 @@ pub fn build(jmdict: &Jmdict) -> EntryRows {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jmdict::{Gloss, KanjiForm, Reading, Sense};
+    use crate::jmdict::{Gloss, Reading, Sense, WrittenForm};
 
-    fn kanji(text: &str, tags: &[&str]) -> KanjiForm {
-        KanjiForm {
+    fn kanji(text: &str, tags: &[&str]) -> WrittenForm {
+        WrittenForm {
             text: text.into(),
             tags: tags.iter().map(|t| (*t).into()).collect(),
         }
@@ -308,7 +308,7 @@ mod tests {
     fn ids_follow_the_word_id_and_the_position() {
         let entry = |seq| Entry {
             seq,
-            kanji: vec![kanji("一", &[]), kanji("壱", &[])],
+            written_forms: vec![kanji("一", &[]), kanji("壱", &[])],
             readings: vec![reading("いち"), reading("いつ")],
             senses: vec![sense(&[]), sense(&[])],
         };
@@ -316,7 +316,7 @@ mod tests {
         let rows = build(&jmdict(vec![entry(20), entry(10)]));
         assert_eq!(rows.words, vec![10, 20]);
         let ids: Vec<(u32, u32, u32)> = rows
-            .kanji_forms
+            .written_forms
             .iter()
             .map(|k| (k.id, k.word_id, k.position))
             .collect();
@@ -339,10 +339,10 @@ mod tests {
     }
 
     #[test]
-    fn reading_restriction_links_the_named_kanji_form() {
+    fn reading_restriction_links_the_named_written_form() {
         let rows = build(&jmdict(vec![Entry {
             seq: 1,
-            kanji: vec![kanji("一寸", &[]), kanji("鳥渡", &[])],
+            written_forms: vec![kanji("一寸", &[]), kanji("鳥渡", &[])],
             readings: vec![Reading {
                 restrictions: vec!["鳥渡".into()],
                 ..reading("ちょっと")
@@ -356,7 +356,7 @@ mod tests {
     fn sense_restrictions_link_the_named_forms() {
         let rows = build(&jmdict(vec![Entry {
             seq: 1,
-            kanji: vec![kanji("一寸", &[])],
+            written_forms: vec![kanji("一寸", &[])],
             readings: vec![reading("ちょっと"), reading("ちょと")],
             senses: vec![Sense {
                 kanji_restrictions: vec!["一寸".into()],
@@ -364,7 +364,7 @@ mod tests {
                 ..Sense::default()
             }],
         }]));
-        assert_eq!(rows.sense_kanji_forms, vec![(1, 1)]);
+        assert_eq!(rows.sense_written_forms, vec![(1, 1)]);
         assert_eq!(rows.sense_readings, vec![(1, 2)]);
     }
 
@@ -372,7 +372,7 @@ mod tests {
     fn restriction_that_names_no_form_is_skipped() {
         let rows = build(&jmdict(vec![Entry {
             seq: 42,
-            kanji: vec![kanji("一寸", &[])],
+            written_forms: vec![kanji("一寸", &[])],
             readings: vec![Reading {
                 restrictions: vec!["鳥渡".into()],
                 ..reading("ちょっと")
@@ -406,7 +406,7 @@ mod tests {
     fn same_name_in_two_categories_gives_two_tags() {
         let rows = build(&jmdict(vec![Entry {
             seq: 1,
-            kanji: vec![kanji("一寸", &["ik"])],
+            written_forms: vec![kanji("一寸", &["ik"])],
             readings: vec![Reading {
                 tags: vec!["ik".into()],
                 ..reading("ちょっと")
@@ -419,7 +419,7 @@ mod tests {
             .map(|t| (t.category, t.name.as_str()))
             .collect();
         assert_eq!(tags, vec![(Category::KeInf, "ik"), (Category::ReInf, "ik")]);
-        assert_eq!(rows.kanji_form_tags, vec![(1, 1)]);
+        assert_eq!(rows.written_form_tags, vec![(1, 1)]);
         assert_eq!(rows.reading_tags, vec![(1, 2)]);
     }
 

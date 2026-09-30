@@ -102,69 +102,69 @@ gloss	6	1	T-shirt	NULL
 gloss	7	1	deadline	NULL
 gloss	8	1	to scold	NULL
 gloss	9	1	god	NULL
-kanji_form	1	1000010	1	正
-kanji_form	10	1000100	1	神
-kanji_form	11	1000110	1	﨑
-kanji_form	12	1000120	1	日日
-kanji_form	13	1000130	1	語
-kanji_form	14	1000140	1	休む
-kanji_form	15	1000150	1	池
-kanji_form	16	1000160	1	性
-kanji_form	17	1000170	1	恭しい
-kanji_form	18	1000180	1	持つ
-kanji_form	19	1000190	1	点
-kanji_form	2	1000010	2	誤
-kanji_form	20	1000200	1	飯
-kanji_form	21	1000210	1	每
-kanji_form	22	1000500	1	一寸
-kanji_form	23	1000500	2	鳥渡
-kanji_form	24	1000510	1	明日
-kanji_form	25	1000510	2	翌日
-kanji_form	26	1000520	1	手
-kanji_form	3	1000030	1	一寸
-kanji_form	4	1000040	1	人々
-kanji_form	5	1000050	1	一ヶ月
-kanji_form	6	1000060	1	取り扱い
-kanji_form	7	1000070	1	Tシャツ
-kanji_form	8	1000080	1	〆切
-kanji_form	9	1000090	1	𠮟る
-kanji_form_kanji	1	正
-kanji_form_kanji	10	神
-kanji_form_kanji	11	﨑
-kanji_form_kanji	12	日
-kanji_form_kanji	13	語
-kanji_form_kanji	14	休
-kanji_form_kanji	15	池
-kanji_form_kanji	16	性
-kanji_form_kanji	17	恭
-kanji_form_kanji	18	持
-kanji_form_kanji	19	点
-kanji_form_kanji	2	誤
-kanji_form_kanji	20	飯
-kanji_form_kanji	21	每
-kanji_form_kanji	22	一
-kanji_form_kanji	22	寸
-kanji_form_kanji	23	渡
-kanji_form_kanji	23	鳥
-kanji_form_kanji	24	日
-kanji_form_kanji	24	明
-kanji_form_kanji	25	日
-kanji_form_kanji	25	翌
-kanji_form_kanji	26	手
-kanji_form_kanji	3	一
-kanji_form_kanji	3	寸
-kanji_form_kanji	4	人
-kanji_form_kanji	5	一
-kanji_form_kanji	5	月
-kanji_form_kanji	6	取
-kanji_form_kanji	6	扱
-kanji_form_kanji	8	切
-kanji_form_kanji	9	𠮟
-kanji_form_tag	2	1
-kanji_form_tag	22	1
-kanji_form_tag	23	4
-kanji_form_tag	23	5
-kanji_form_tag	25	9
+written_form	1	1000010	1	正
+written_form	10	1000100	1	神
+written_form	11	1000110	1	﨑
+written_form	12	1000120	1	日日
+written_form	13	1000130	1	語
+written_form	14	1000140	1	休む
+written_form	15	1000150	1	池
+written_form	16	1000160	1	性
+written_form	17	1000170	1	恭しい
+written_form	18	1000180	1	持つ
+written_form	19	1000190	1	点
+written_form	2	1000010	2	誤
+written_form	20	1000200	1	飯
+written_form	21	1000210	1	每
+written_form	22	1000500	1	一寸
+written_form	23	1000500	2	鳥渡
+written_form	24	1000510	1	明日
+written_form	25	1000510	2	翌日
+written_form	26	1000520	1	手
+written_form	3	1000030	1	一寸
+written_form	4	1000040	1	人々
+written_form	5	1000050	1	一ヶ月
+written_form	6	1000060	1	取り扱い
+written_form	7	1000070	1	Tシャツ
+written_form	8	1000080	1	〆切
+written_form	9	1000090	1	𠮟る
+written_form_kanji	1	正
+written_form_kanji	10	神
+written_form_kanji	11	﨑
+written_form_kanji	12	日
+written_form_kanji	13	語
+written_form_kanji	14	休
+written_form_kanji	15	池
+written_form_kanji	16	性
+written_form_kanji	17	恭
+written_form_kanji	18	持
+written_form_kanji	19	点
+written_form_kanji	2	誤
+written_form_kanji	20	飯
+written_form_kanji	21	每
+written_form_kanji	22	一
+written_form_kanji	22	寸
+written_form_kanji	23	渡
+written_form_kanji	23	鳥
+written_form_kanji	24	日
+written_form_kanji	24	明
+written_form_kanji	25	日
+written_form_kanji	25	翌
+written_form_kanji	26	手
+written_form_kanji	3	一
+written_form_kanji	3	寸
+written_form_kanji	4	人
+written_form_kanji	5	一
+written_form_kanji	5	月
+written_form_kanji	6	取
+written_form_kanji	6	扱
+written_form_kanji	8	切
+written_form_kanji	9	𠮟
+written_form_tag	2	1
+written_form_tag	22	1
+written_form_tag	23	4
+written_form_tag	23	5
+written_form_tag	25	9
 mutant	⺗	心
 mutant	⻞	食
 mutant	亻	人
@@ -210,7 +210,7 @@ sense	6	1000070	1	NULL
 sense	7	1000080	1	NULL
 sense	8	1000090	1	NULL
 sense	9	1000100	1	NULL
-sense_kanji_form	22	22
+sense_written_form	22	22
 sense_reading	22	3
 sense_tag	1	2
 sense_tag	2	3

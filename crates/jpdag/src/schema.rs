@@ -19,10 +19,10 @@ CREATE TABLE character_component (
   PRIMARY KEY (character_id, component_id)
 ) STRICT, WITHOUT ROWID;
 
-CREATE TABLE kanji_form_kanji (
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
+CREATE TABLE written_form_kanji (
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
   kanji_id      INTEGER NOT NULL REFERENCES character(id),
-  PRIMARY KEY (kanji_form_id, kanji_id)
+  PRIMARY KEY (written_form_id, kanji_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE mutant (
@@ -31,7 +31,7 @@ CREATE TABLE mutant (
   PRIMARY KEY (mutant_id, base_id)
 ) STRICT, WITHOUT ROWID;
 
-CREATE TABLE kanji_form (
+CREATE TABLE written_form (
   id       INTEGER PRIMARY KEY,
   word_id  INTEGER NOT NULL REFERENCES word(id),
   position INTEGER NOT NULL,
@@ -50,8 +50,8 @@ CREATE TABLE reading (
 
 CREATE TABLE reading_restriction (
   reading_id    INTEGER NOT NULL REFERENCES reading(id),
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
-  PRIMARY KEY (reading_id, kanji_form_id)
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
+  PRIMARY KEY (reading_id, written_form_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE sense (
@@ -70,10 +70,10 @@ CREATE TABLE gloss (
   PRIMARY KEY (sense_id, position)
 ) STRICT, WITHOUT ROWID;
 
-CREATE TABLE sense_kanji_form (
+CREATE TABLE sense_written_form (
   sense_id      INTEGER NOT NULL REFERENCES sense(id),
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
-  PRIMARY KEY (sense_id, kanji_form_id)
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
+  PRIMARY KEY (sense_id, written_form_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE sense_reading (
@@ -90,10 +90,10 @@ CREATE TABLE tag (
   UNIQUE (category, name)
 ) STRICT;
 
-CREATE TABLE kanji_form_tag (
-  kanji_form_id INTEGER NOT NULL REFERENCES kanji_form(id),
+CREATE TABLE written_form_tag (
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
   tag_id        INTEGER NOT NULL REFERENCES tag(id),
-  PRIMARY KEY (kanji_form_id, tag_id)
+  PRIMARY KEY (written_form_id, tag_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE reading_tag (
@@ -115,12 +115,12 @@ CREATE TABLE source (
   attribution TEXT NOT NULL
 ) STRICT;
 
-CREATE INDEX kanji_form_text                  ON kanji_form(text);
+CREATE INDEX written_form_text                  ON written_form(text);
 CREATE INDEX reading_text                     ON reading(text);
-CREATE INDEX kanji_form_kanji_kanji_id        ON kanji_form_kanji(kanji_id);
+CREATE INDEX written_form_kanji_kanji_id        ON written_form_kanji(kanji_id);
 CREATE INDEX character_component_component_id ON character_component(component_id);
 CREATE INDEX mutant_base_id                   ON mutant(base_id);
-CREATE INDEX kanji_form_tag_tag_id            ON kanji_form_tag(tag_id);
+CREATE INDEX written_form_tag_tag_id            ON written_form_tag(tag_id);
 CREATE INDEX reading_tag_tag_id               ON reading_tag(tag_id);
 CREATE INDEX sense_tag_tag_id                 ON sense_tag(tag_id);
 ";
