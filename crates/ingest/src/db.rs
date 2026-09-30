@@ -18,10 +18,10 @@ pub struct Source {
     pub attribution: &'static str,
 }
 
-/// The rows of the 17 tables. Each character is a code point.
+/// Rows of the 17 tables. Each character is a code point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Rows {
-    /// The rows of `word`, the entry tables, and the tag tables.
+    /// Rows of `word`, the entry tables, and the tag tables.
     pub entries: EntryRows,
     /// Each row as (kanji_form_id, kanji_id).
     pub kanji_form_kanji: Vec<(u32, u32)>,
@@ -34,7 +34,7 @@ pub struct Rows {
 }
 
 impl Rows {
-    /// The number of rows in each table, in the order of the schema.
+    /// Number of rows in each table, in schema order.
     pub fn counts(&self) -> [(&'static str, usize); 17] {
         let e = &self.entries;
         [

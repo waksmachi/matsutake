@@ -1,4 +1,4 @@
-//! The integration test: runs the ingest binary on the fixture sources in `tests/fixtures/`.
+//! Integration test: runs the ingest binary on the fixture sources in `tests/fixtures/`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -7,7 +7,7 @@ use std::process::Command;
 use rusqlite::Connection;
 use rusqlite::types::ValueRef;
 
-/// The tables of `content.db`, in the order of the schema.
+/// Tables of `content.db`, in schema order.
 const TABLES: [&str; 17] = [
     "word",
     "character",
@@ -28,7 +28,7 @@ const TABLES: [&str; 17] = [
     "source",
 ];
 
-/// The columns that hold a code point. The dump shows the character.
+/// Columns that hold a code point. The dump shows the character.
 const CHARACTER_COLUMNS: [(&str, &str); 7] = [
     ("character", "id"),
     ("character_component", "character_id"),
@@ -69,7 +69,7 @@ fn out_dir(name: &str) -> PathBuf {
     Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
 }
 
-/// The rows of `content.db` in the format of `expected.tsv`, sorted: the table, then the value of
+/// Rows of `content.db` in the format of `expected.tsv`, sorted: the table, then the value of
 /// each column. A code point is shown as its character, and the attribution text as `…`.
 fn dump(db: &Path) -> Vec<String> {
     let conn = Connection::open(db).unwrap();

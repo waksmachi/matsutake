@@ -9,7 +9,7 @@ use quick_xml::{Reader, XmlVersion};
 
 use crate::source::Source;
 
-/// The category of a tag: the element that holds the tag.
+/// Category of a tag: the element that holds the tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Category {
     /// `<ke_inf>`: information about a kanji form, for example `ateji` (phonetic kanji), `iK`
@@ -43,7 +43,7 @@ impl Category {
         }
     }
 
-    /// The category of a tag that a `<sense>` element holds.
+    /// Category of a tag that a `<sense>` element holds.
     fn of_sense_element(name: &str) -> Option<Self> {
         match name {
             "pos" => Some(Category::Pos),
@@ -58,62 +58,62 @@ impl Category {
 #[derive(Debug, Default)]
 pub struct Jmdict {
     pub entries: Vec<Entry>,
-    /// The text of each entity that the DTD declares, by the name of the entity.
+    /// Text of each entity that the DTD declares, by the name of the entity.
     pub entities: HashMap<String, String>,
-    /// The date in the comment `<!-- JMdict created: YYYY-MM-DD -->`.
+    /// Date in the comment `<!-- JMdict created: YYYY-MM-DD -->`.
     pub version: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Entry {
-    /// The `<ent_seq>` value.
+    /// `<ent_seq>` value.
     pub seq: u32,
-    /// The kanji forms, in the order of the entry.
+    /// Kanji forms, in entry order.
     pub kanji: Vec<KanjiForm>,
-    /// The readings, in the order of the entry.
+    /// Readings, in entry order.
     pub readings: Vec<Reading>,
-    /// The senses, in the order of the entry.
+    /// Senses, in entry order.
     pub senses: Vec<Sense>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct KanjiForm {
-    /// The `<keb>` text.
+    /// `<keb>` text.
     pub text: String,
-    /// The `<ke_inf>` tags.
+    /// `<ke_inf>` tags.
     pub tags: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Reading {
-    /// The `<reb>` text.
+    /// `<reb>` text.
     pub text: String,
     /// True if the element holds `<re_nokanji/>`.
     pub no_kanji: bool,
-    /// The `<re_restr>` texts: the kanji forms that the reading applies to.
+    /// `<re_restr>` texts: the kanji forms that the reading applies to.
     pub restrictions: Vec<String>,
-    /// The `<re_inf>` tags.
+    /// `<re_inf>` tags.
     pub tags: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Sense {
-    /// The `<stagk>` texts: the kanji forms that the sense applies to.
+    /// `<stagk>` texts: the kanji forms that the sense applies to.
     pub kanji_restrictions: Vec<String>,
-    /// The `<stagr>` texts: the readings that the sense applies to.
+    /// `<stagr>` texts: the readings that the sense applies to.
     pub reading_restrictions: Vec<String>,
-    /// The `<pos>`, `<field>`, `<misc>`, and `<dial>` tags, in the order of the sense.
+    /// `<pos>`, `<field>`, `<misc>`, and `<dial>` tags, in sense order.
     pub tags: Vec<(Category, String)>,
-    /// The glosses, in the order of the sense.
+    /// Glosses, in sense order.
     pub glosses: Vec<Gloss>,
-    /// The `<s_inf>` texts.
+    /// `<s_inf>` texts.
     pub notes: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Gloss {
     pub text: String,
-    /// The `g_type` value, for example `lit`.
+    /// `g_type` value, for example `lit`.
     pub g_type: Option<String>,
 }
 

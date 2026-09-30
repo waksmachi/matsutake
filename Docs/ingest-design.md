@@ -17,7 +17,7 @@ The `ingest` crate builds the graph in stages.
 1. *JMdict* gives the words, with their kanji forms, readings, senses, glosses, and tags.
 2. *KanjiVG* gives the component tree of each character.
 3. `data/mutants.tsv`, a list in this repository, gives the mutant mapping.
-4. The graph is written from memory into `content.db`.
+4. Graph is written from memory into `content.db`.
 
 ## 2. Scope
 
@@ -28,10 +28,10 @@ The graph:
 | Table | Content |
 | --- | --- |
 | `word` | 1 row for each JMdict entry |
-| `kanji_form_kanji` | The kanji of each kanji form |
+| `kanji_form_kanji` | Kanji of each kanji form |
 | `character` | Each character that the other tables refer to |
-| `character_component` | The direct components of each character |
-| `mutant` | The base of each mutant |
+| `character_component` | Direct components of each character |
+| `mutant` | Base of each mutant |
 
 The structure of each JMdict entry:
 
@@ -39,20 +39,20 @@ The structure of each JMdict entry:
 | --- | --- |
 | `kanji_form` | 1 row for each `<k_ele>` |
 | `reading` | 1 row for each `<r_ele>` |
-| `reading_restriction` | The kanji forms that a reading applies to (`<re_restr>`) |
+| `reading_restriction` | Kanji forms that a reading applies to (`<re_restr>`) |
 | `sense` | 1 row for each `<sense>`, with its note (`<s_inf>`) |
-| `gloss` | The English glosses of each sense (`<gloss>`) |
-| `sense_kanji_form` | The kanji forms that a sense applies to (`<stagk>`) |
-| `sense_reading` | The readings that a sense applies to (`<stagr>`) |
+| `gloss` | English glosses of each sense (`<gloss>`) |
+| `sense_kanji_form` | Kanji forms that a sense applies to (`<stagk>`) |
+| `sense_reading` | Readings that a sense applies to (`<stagr>`) |
 
 The JMdict tags:
 
 | Table | Content |
 | --- | --- |
 | `tag` | 1 row for each tag, with its category and its description |
-| `kanji_form_tag` | The `<ke_inf>` tags of each kanji form |
-| `reading_tag` | The `<re_inf>` tags of each reading |
-| `sense_tag` | The `<pos>`, `<field>`, `<misc>`, and `<dial>` tags of each sense |
+| `kanji_form_tag` | `<ke_inf>` tags of each kanji form |
+| `reading_tag` | `<re_inf>` tags of each reading |
+| `sense_tag` | `<pos>`, `<field>`, `<misc>`, and `<dial>` tags of each sense |
 
 The provenance of the data:
 
@@ -64,8 +64,8 @@ Later designs add these items:
 
 - example sentences
 - general frequency (`word.zipf`), and the priority values of `<ke_pri>` and `<re_pri>`
-- the other text of a sense: `<lsource>`, `<xref>`, and `<ant>`
-- the stroke geometry of each KanjiVG entry, so the app can draw a character and show a tooltip
+- other text of a sense: `<lsource>`, `<xref>`, and `<ant>`
+- stroke geometry of each KanjiVG entry, so the app can draw a character and show a tooltip
   for each component when the user points at its strokes
 
 ## 3. Terms
@@ -73,7 +73,7 @@ Later designs add these items:
 | Term | Meaning |
 | --- | --- |
 | Character | 1 code point after normalization. `character.id` is the code point. |
-| Normalization | The function `jpdag::normalize`, which the pipeline applies to each code point from a source (section 6.1) |
+| Normalization | Function `jpdag::normalize`, which the pipeline applies to each code point from a source (section 6.1) |
 | Kanji form | A written form of a JMdict entry with kanji. Each `<keb>` element gives 1 kanji form. |
 | Reading | A written form of a JMdict entry in kana. Each `<reb>` element gives 1 reading. |
 | Sense | 1 meaning of a JMdict entry. Each `<sense>` element gives 1 sense. |
@@ -85,7 +85,7 @@ Later designs add these items:
 | Direct component | A component at the highest level of the groups of a character (section 6.4). 言 and 吾 are the direct components of 語. |
 | KanjiVG component | A character that is a direct component of 1 or more KanjiVG entries |
 | Mutant | A variant of a kanji that occurs as a component, for example 氵 |
-| Base | The kanji of a mutant, for example 水 for 氵 |
+| Base | Kanji of a mutant, for example 水 for 氵 |
 | Uncovered character | A character with no KanjiVG entry, because KanjiVG does not cover it. An uncovered character has no `character_component` rows. |
 
 ## 4. Datasources
@@ -93,14 +93,14 @@ Later designs add these items:
 | Source | File | Publisher | Licence | Use |
 | --- | --- | --- | --- | --- |
 | JMdict | `JMdict_e.gz` | EDRDG | CC BY-SA 4.0 | Entries, kanji forms, readings, senses, and tags |
-| KanjiVG | `kanjivg-YYYYMMDD.xml.gz`, from the GitHub release | KanjiVG project | CC BY-SA 3.0 | The components of each character |
+| KanjiVG | `kanjivg-YYYYMMDD.xml.gz`, from the GitHub release | KanjiVG project | CC BY-SA 3.0 | Components of each character |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
 KanjiVG release, for example r20250816. JMdict has no releases, so the script downloads the current
 file. EDRDG publishes a new JMdict file each day.
 
 `data/mutants.tsv` is not a download. The first 19 rows of the file come from `japanese-radicals.csv`
-of Kanji alive (CC BY 4.0), and the header of the file credits Kanji alive (section 6.5).
+of Kanji alive (CC BY 4.0), and the file's header credits Kanji alive (section 6.5).
 
 `content.db` is a derivative of JMdict and KanjiVG, so CC BY-SA applies to it. The `source` table
 holds the attribution that each licence asks for, so the app can show it.
@@ -219,7 +219,7 @@ CREATE TABLE sense_tag (
 
 CREATE TABLE source (
   name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, or Kanji alive
-  version     TEXT,                                         -- the date of the file
+  version     TEXT,                                         -- the file's date
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
 ) STRICT;
@@ -278,10 +278,10 @@ so they stay 2 characters, and `mutant` links them.
 | Stage | Input | Output |
 | --- | --- | --- |
 | 1. Parse JMdict | `JMdict_e.gz` | Each entry, with its kanji forms, readings, senses, and tags |
-| 2. Build the word rows | Stage 1 | The rows of `word`, `kanji_form_kanji`, the entry tables, and the tag tables |
-| 3. Parse KanjiVG | `kanjivg-*.xml.gz` | The direct components of each KanjiVG entry |
-| 4. Read the mutants | `data/mutants.tsv`, and the KanjiVG components of stage 3 | The candidate `mutant` rows |
-| 5. Complete the character set | Stages 2, 3, and 4 | The `character`, `character_component`, and `mutant` rows |
+| 2. Build the word rows | Stage 1 | Rows of `word`, `kanji_form_kanji`, the entry tables, and the tag tables |
+| 3. Parse KanjiVG | `kanjivg-*.xml.gz` | Direct components of each KanjiVG entry |
+| 4. Read the mutants | `data/mutants.tsv`, and the KanjiVG components of stage 3 | Candidate `mutant` rows |
+| 5. Complete the character set | Stages 2, 3, and 4 | `character`, `character_component`, and `mutant` rows |
 | 6. Write `content.db` | Stages 1, 2, 3, and 5 | `content.db` |
 
 ### 6.1 Normalization
@@ -318,12 +318,12 @@ The result can have more than 1 code point. For example, normalization gives 平
 4. For each `<k_ele>`, keep the `<keb>` text and the `<ke_inf>` tags.
 5. For each `<r_ele>`, keep the `<reb>` text, the `<re_inf>` tags, and the `<re_restr>` texts. Keep
    whether the element holds `<re_nokanji/>`.
-6. For each `<sense>`, keep the `<stagk>` texts and the `<stagr>` texts. Keep the `<pos>`,
+6. For each `<sense>`, keep the `<stagk>` and `<stagr>` texts. Keep the `<pos>`,
    `<field>`, `<misc>`, and `<dial>` tags. Keep the text of each `<gloss>`, and its `g_type` value.
    Keep the text of each `<s_inf>`.
 7. Discard all other elements.
 
-Stage 1 keeps the kanji forms, readings, senses, and glosses of an entry in the order of the file.
+Stage 1 keeps the kanji forms, readings, senses, and glosses of an entry in file order.
 Later designs read the elements that step 7 discards, for example `<lsource>`.
 
 JMdict writes each tag as an entity reference, for example `&uk;`. The document type definition (DTD)
@@ -332,7 +332,7 @@ the name of the entity as the tag, and keeps the text as the description of the 
 becomes the tag `uk`, with the description "word usually written using kana alone". An entity that
 the DTD does not declare also keeps its name, and its tag has no description.
 
-Stage 1 also reads the version of the file: the date in the comment `<!-- JMdict created:
+Stage 1 also reads the file's version: the date in the comment `<!-- JMdict created:
 YYYY-MM-DD -->`. If the file has no such comment, the version is NULL, and the build report says
 so.
 
@@ -456,20 +456,20 @@ KanjiVG gives some components without a code point. KanjiVG then uses a Chinese 
 group with such a component gives no direct component, so the parser visits its child groups. The
 build report lists these groups.
 
-Stage 3 also reads the version of the file: the date in the header comment "This file was generated
+Stage 3 also reads the file's version: the date in the header comment "This file was generated
 on YYYY-MM-DD". If the file has no such comment, the version is NULL, and the build report says so.
 
 ### 6.5 Stage 4: Read the mutants
 
 `data/mutants.tsv` lists the mutants and their bases. A person keeps the list. Each line has 2
-columns, separated by a tab: the mutant and the base. A line that starts with `#` is a comment. The
+columns, separated by a tab: the mutant and base. A line that starts with `#` is a comment. The
 file is `crates/ingest/data/mutants.tsv`. The binary includes the file when it compiles, so the file
 is not an argument of the binary, and the integration test uses the same list.
 
 1. Read `data/mutants.tsv`.
-2. Normalize the mutant and the base of each line.
+2. Normalize the mutant and base of each line.
 3. If a column does not give exactly 1 character, stop the build.
-4. If the mutant and the base are the same character, stop the build.
+4. If the mutant and base are the same character, stop the build.
 5. If 2 lines give the same mutant and base, stop the build.
 6. If a mutant is not a KanjiVG component, list the mutant in the build report.
 7. Add each line as a stage 4 row.
@@ -551,9 +551,9 @@ The `rusqlite` crate compiles its own SQLite, so `ingest` and the app use the sa
 The binary prints the build report and writes it to `build-report.txt` in the output directory. The
 report shows what the sources gave and what the pipeline discarded:
 
-- the version of each source
-- the number of rows in each table
-- the number of characters with a KanjiVG entry, and the number of uncovered characters
+- version of each source
+- number of rows in each table
+- number of characters with a KanjiVG entry, and the number of uncovered characters
 - each kanji of a word with no KanjiVG entry
 - each direct component with no KanjiVG entry
 - each JMdict tag that the DTD does not declare
@@ -562,7 +562,7 @@ report shows what the sources gave and what the pipeline discarded:
 - each KanjiVG group whose `kvg:element` value does not give exactly 1 code point after normalization
 - each `mutant` row
 - each mutant in `data/mutants.tsv` that is not a KanjiVG component
-- the size of `content.db`
+- size of `content.db`
 
 ## 8. Tests and CI
 
@@ -590,10 +590,10 @@ cargo test -p ingest --test build_checks -- --ignored
 | --- | --- |
 | `foreign_keys_hold` | `PRAGMA foreign_key_check` returns no rows |
 | `golden_component_edges_exist` | `content.db` holds each `character_component` row in `tests/golden_edges.tsv`, for example 語 → 言, 語 → 吾, 吾 → 五, 吾 → 口, 休 → 亻, and 休 → 木 |
-| `one_word_for_each_jmdict_entry` | The number of `word` rows equals the number of JMdict entries |
-| `components_make_no_cycle` | The `character_component` rows make no cycle |
+| `one_word_for_each_jmdict_entry` | Number of `word` rows equals the number of JMdict entries |
+| `components_make_no_cycle` | `character_component` rows make no cycle |
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
-| `one_row_for_each_jmdict_element` | The numbers of `kanji_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
+| `one_row_for_each_jmdict_element` | Numbers of `kanji_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
 | `sources_have_versions` | `source` holds JMdict, KanjiVG, and Kanji alive, and the rows of JMdict and KanjiVG have a version |
 
@@ -607,7 +607,7 @@ cargo test -p ingest --test build_checks -- --ignored
 | `build-checks` | `fetch.sh`, a full build, and the build checks |
 
 The workflow runs on each pull request, on each push to `main`, and each Monday. The Monday run
-checks the new data of the sources. The `build-checks` job keeps the sources in the cache for 1 day,
+checks new source data. The `build-checks` job keeps the sources in the cache for 1 day,
 so the job downloads the sources 1 time each day at most. The job adds the build report to the job
 summary, and uploads `build-report.txt` and `content.db` as an artifact.
 
@@ -633,31 +633,31 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `keeps_the_parts_of_an_entry_in_order` | An entry with 2 kanji forms, each with tags | The `ent_seq`, the 2 kanji forms in order, and the tags of each kanji form |
-| `entity_reference_gives_its_name_as_the_tag` | `<misc>&uk;</misc>` in the first sense | The tag `uk`, not the DTD text |
+| `keeps_the_parts_of_an_entry_in_order` | An entry with 2 kanji forms, each with tags | `ent_seq`, the 2 kanji forms in order, and the tags of each kanji form |
+| `entity_reference_gives_its_name_as_the_tag` | `<misc>&uk;</misc>` in the first sense | Tag `uk`, not the DTD text |
 | `entry_without_kanji_forms` | An entry with no `<k_ele>` | An empty list of kanji forms |
-| `tag_belongs_to_its_own_sense` | `uk` in the second sense only | The tag `uk` on the second sense only |
-| `reads_gzip_input` | The entry of `keeps_the_parts_of_an_entry_in_order`, compressed with gzip | The same result |
+| `tag_belongs_to_its_own_sense` | `uk` in the second sense only | Tag `uk` on the second sense only |
+| `reads_gzip_input` | Entry of `keeps_the_parts_of_an_entry_in_order`, compressed with gzip | Same result |
 | `unclosed_element_error_gives_the_line` | XML with an unclosed element | An error that gives the line number |
-| `undeclared_entity_keeps_its_name` | An entity name that the DTD does not declare | The name, kept as the tag |
-| `readings_keep_restrictions_no_kanji_and_tags` | An entry with 3 readings: 1 with `<re_restr>`, 1 with `<re_nokanji/>`, and 1 with a `<re_inf>` tag | The readings in order, the restriction text, the no-kanji flag, and the tag |
-| `sense_keeps_restrictions_and_tags_by_category` | A sense with `<stagk>`, `<stagr>`, `<pos>`, `<field>`, `<misc>`, and `<dial>` | The 2 restriction texts, and the tags of each category |
-| `dtd_gives_the_entity_descriptions` | A DTD that declares `uk` as "word usually written using kana alone" | The tag `uk` with that description |
-| `glosses_keep_their_order_and_type` | A sense with 2 `<gloss>` elements, the second with `g_type="lit"` | The 2 gloss texts in order, and the type `lit` for the second gloss only |
-| `sense_keeps_its_note` | A sense with `<s_inf>before a verb in negative form</s_inf>` | The note text of the sense |
-| `creation_comment_gives_the_version` | The comment `<!-- JMdict created: 2026-09-28 -->` | The version 2026-09-28 |
+| `undeclared_entity_keeps_its_name` | An entity name that the DTD does not declare | Name, kept as the tag |
+| `readings_keep_restrictions_no_kanji_and_tags` | An entry with 3 readings: 1 with `<re_restr>`, 1 with `<re_nokanji/>`, and 1 with a `<re_inf>` tag | Readings in order, the restriction text, the no-kanji flag, and the tag |
+| `sense_keeps_restrictions_and_tags_by_category` | A sense with `<stagk>`, `<stagr>`, `<pos>`, `<field>`, `<misc>`, and `<dial>` | 2 restriction texts, and the tags of each category |
+| `dtd_gives_the_entity_descriptions` | A DTD that declares `uk` as "word usually written using kana alone" | Tag `uk` with that description |
+| `glosses_keep_their_order_and_type` | A sense with 2 `<gloss>` elements, the second with `g_type="lit"` | 2 gloss texts in order, and the type `lit` for the second gloss only |
+| `sense_keeps_its_note` | A sense with `<s_inf>before a verb in negative form</s_inf>` | Note text of the sense |
+| `creation_comment_gives_the_version` | Comment `<!-- JMdict created: 2026-09-28 -->` | Version 2026-09-28 |
 | `no_creation_comment_gives_no_version` | A file with no creation comment | No version, and the build report says so |
 
 ### `words.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `ids_follow_the_word_id_and_the_position` | 2 entries, each with 2 kanji forms, 2 readings, and 2 senses | The rows in the order of the word id and the position, with the positions 1 and 2 |
+| `ids_follow_the_word_id_and_the_position` | 2 entries, each with 2 kanji forms, 2 readings, and 2 senses | Rows in order of word id and position, with the positions 1 and 2 |
 | `reading_restriction_links_the_named_kanji_form` | A reading whose `<re_restr>` names the second kanji form | 1 `reading_restriction` row to the second kanji form |
 | `sense_restrictions_link_the_named_forms` | A sense with 1 `<stagk>` and 1 `<stagr>` | 1 `sense_kanji_form` row and 1 `sense_reading` row |
 | `restriction_that_names_no_form_is_skipped` | A `<re_restr>` text that names no kanji form of the entry | No `reading_restriction` row, and the build report lists the restriction with the `ent_seq` |
-| `sense_without_pos_takes_the_previous_pos` | A second sense with no `<pos>` | The `sense_tag` rows of the second sense hold the `<pos>` tags of the first sense |
-| `same_name_in_two_categories_gives_two_tags` | The name `ik` in a `<ke_inf>` and in a `<re_inf>` | 2 `tag` rows, with the categories `ke_inf` and `re_inf` |
+| `sense_without_pos_takes_the_previous_pos` | A second sense with no `<pos>` | `sense_tag` rows of the second sense hold the `<pos>` tags of the first sense |
+| `same_name_in_two_categories_gives_two_tags` | Name `ik` in a `<ke_inf>` and in a `<re_inf>` | 2 `tag` rows, with the categories `ke_inf` and `re_inf` |
 | `undeclared_entity_gives_a_tag_without_description` | An entity that the DTD does not declare | A `tag` row with no description, and the build report lists the tag |
 | `glosses_get_positions_in_their_sense` | 2 senses: the first with 3 glosses, the second with no gloss | 3 `gloss` rows with the positions 1 to 3 for the first sense, and a `sense` row with no `gloss` rows for the second |
 | `sense_notes_are_joined` | A sense with 1 `<s_inf>`, a sense with 2 `<s_inf>`, and a sense with none | `sense.note` is the text, the 2 texts joined with "; ", and NULL |
@@ -666,9 +666,9 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `each_kanji_form_links_to_its_kanji` | The kanji forms 一寸 and 鳥渡 | 一 and 寸 link to 一寸, and 鳥 and 渡 link to 鳥渡 |
-| `tags_do_not_filter_the_links` | A kanji form with the tag `rK` | The kanji of the form. Tags do not filter the links. |
-| `uk_does_not_filter_the_links` | A word with `uk` in the first sense | The kanji of each kanji form. `uk` does not filter the links. |
+| `each_kanji_form_links_to_its_kanji` | Kanji forms 一寸 and 鳥渡 | 一 and 寸 link to 一寸, and 鳥 and 渡 link to 鳥渡 |
+| `tags_do_not_filter_the_links` | A kanji form with the tag `rK` | Kanji of the form. Tags do not filter the links. |
+| `uk_does_not_filter_the_links` | A word with `uk` in the first sense | Kanji of each kanji form. `uk` does not filter the links. |
 | `iteration_mark_is_not_a_kanji` | 人々 | 人 |
 | `small_ke_is_not_a_kanji` | 一ヶ月 | 一, 月 |
 | `okurigana_are_not_kanji` | 取り扱い | 取, 扱 |
@@ -683,19 +683,19 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `records_direct_components_only` | 語, with the components 五 and 口 inside the group of 吾 | The direct components 言 and 吾 only |
-| `group_without_element_passes_to_its_children` | A group without `kvg:element` that holds 2 groups with `kvg:element` | The `kvg:element` values of the 2 inner groups are direct components |
+| `records_direct_components_only` | 語, with the components 五 and 口 inside the group of 吾 | Direct components 言 and 吾 only |
+| `group_without_element_passes_to_its_children` | A group without `kvg:element` that holds 2 groups with `kvg:element` | `kvg:element` values of the 2 inner groups are direct components |
 | `split_component_gives_one_component` | 2 groups with the same `kvg:element`, and the `kvg:part` values 1 and 2 | 1 direct component |
-| `character_is_not_its_own_component` | A top group whose `kvg:element` is the kanji of the entry | The kanji is not a direct component of itself |
+| `character_is_not_its_own_component` | A top group whose `kvg:element` is the kanji of the entry | Kanji is not a direct component of itself |
 | `variant_style_entry_is_ignored` | `id="kvg:kanji_08a9e-Kaisho"` | No KanjiVG entry |
-| `uses_element_not_original` | `kvg:element="亻"` with `kvg:original="人"` | The direct component 亻 |
-| `element_is_normalized` | `kvg:element="⼝"` (U+2F1D) | The direct component 口 (U+53E3) |
-| `entry_of_a_supplementary_plane` | `id="kvg:kanji_20b9f"` | The code point U+20B9F |
-| `cdp_code_is_reported_and_its_children_visited` | `kvg:element="CDP-8BD0"` | The child groups give the direct components, and the build report lists the group |
-| `nested_group_that_names_the_entry_is_skipped` | A nested group whose `kvg:element` gives the kanji of the entry after normalization | The child groups give the direct components |
-| `radical_eat_two_is_a_component` | `kvg:element="⻞"` | The direct component ⻞ |
-| `entry_that_normalization_changes_is_ignored` | The `<kanji>` element of ⺨ | No KanjiVG entry |
-| `generated_comment_gives_the_version` | The comment "This file was generated on 2025-08-16 from the most recent KanjiVG data." | The version 2025-08-16 |
+| `uses_element_not_original` | `kvg:element="亻"` with `kvg:original="人"` | Direct component 亻 |
+| `element_is_normalized` | `kvg:element="⼝"` (U+2F1D) | Direct component 口 (U+53E3) |
+| `entry_of_a_supplementary_plane` | `id="kvg:kanji_20b9f"` | Code point U+20B9F |
+| `cdp_code_is_reported_and_its_children_visited` | `kvg:element="CDP-8BD0"` | Child groups give the direct components, and the build report lists the group |
+| `nested_group_that_names_the_entry_is_skipped` | A nested group whose `kvg:element` gives the kanji of the entry after normalization | Child groups give the direct components |
+| `radical_eat_two_is_a_component` | `kvg:element="⻞"` | Direct component ⻞ |
+| `entry_that_normalization_changes_is_ignored` | `<kanji>` element of ⺨ | No KanjiVG entry |
+| `generated_comment_gives_the_version` | Comment "This file was generated on 2025-08-16 from the most recent KanjiVG data." | Version 2025-08-16 |
 
 ### `mutants.rs`
 
@@ -703,46 +703,46 @@ Each row gives the name of the test function of the case.
 | --- | --- | --- |
 | `reads_a_row` | A line with a mutant and a base | 1 stage 4 row |
 | `skips_comments_and_blank_lines` | A line that starts with `#` | No row |
-| `column_with_two_characters_fails` | A line whose first column has 2 characters | The build fails, and the error gives the line number |
-| `mutant_equal_to_its_base_fails` | A line whose mutant and base are the same character after normalization | The build fails |
-| `duplicate_row_fails` | 2 lines with the same mutant and base | The build fails |
-| `mound_and_city_normalize_to_one_mutant` | The lines ⻖ → 阜 and ⻏ → 邑 | The rows 阝 → 阜 and 阝 → 邑 |
+| `column_with_two_characters_fails` | A line whose first column has 2 characters | Build fails, and the error gives the line number |
+| `mutant_equal_to_its_base_fails` | A line whose mutant and base are the same character after normalization | Build fails |
+| `duplicate_row_fails` | 2 lines with the same mutant and base | Build fails |
+| `mound_and_city_normalize_to_one_mutant` | Lines ⻖ → 阜 and ⻏ → 邑 | Rows 阝 → 阜 and 阝 → 邑 |
 | `mutant_that_is_not_a_kanjivg_component_is_reported` | A mutant that is not a KanjiVG component | 1 stage 4 row, and the build report lists the mutant |
 
 ### `components.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `kanji_with_an_entry_gets_its_components` | A kanji of a word with a KanjiVG entry | The direct components of the KanjiVG entry |
-| `component_without_an_entry_is_uncovered` | A KanjiVG entry with a direct component P, where P has no KanjiVG entry | The direct components of the entry. P is an uncovered character, and the build report lists P. |
+| `kanji_with_an_entry_gets_its_components` | A kanji of a word with a KanjiVG entry | Direct components of the KanjiVG entry |
+| `component_without_an_entry_is_uncovered` | A KanjiVG entry with a direct component P, where P has no KanjiVG entry | Direct components of the entry. P is an uncovered character, and the build report lists P. |
 | `kanji_without_an_entry_is_uncovered` | A kanji of a word with no KanjiVG entry | An uncovered character that the build report lists |
-| `components_of_a_component_join_the_set` | A direct component with a KanjiVG entry | The direct components of that component are in the set |
-| `base_of_a_mutant_joins_the_set` | A character in the set that is the mutant of a stage 4 row | The base is in the set |
+| `components_of_a_component_join_the_set` | A direct component with a KanjiVG entry | Direct components of that component are in the set |
+| `base_of_a_mutant_joins_the_set` | A character in the set that is the mutant of a stage 4 row | Base is in the set |
 | `mutant_outside_the_set_gives_no_row` | A stage 4 row whose mutant is not in the set | No `mutant` row |
 
 ### `db.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `empty_build_creates_the_schema` | A build with no rows | The 17 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
-| `rows_round_trip` | A small set of rows | The same rows in each table |
-| `foreign_key_violation_fails_the_build` | A `kanji_form_kanji` row whose `kanji_id` has no `character` row | The build fails, and no `content.db` exists |
-| `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | The previous `content.db` is unchanged, and no `content.db.tmp` exists |
+| `empty_build_creates_the_schema` | A build with no rows | 17 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
+| `rows_round_trip` | A small set of rows | Same rows in each table |
+| `foreign_key_violation_fails_the_build` | A `kanji_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
+| `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
 
 ### Integration test (`tests/pipeline.rs`)
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `fixture_rows_equal_expected` | The fixture sources in `tests/fixtures/` | The rows of the 17 tables equal the rows in `tests/fixtures/expected.tsv` |
-| `two_runs_give_the_same_rows` | 2 runs on the same fixtures | The same rows in each table |
-| `report_counts_match_the_fixtures` | The fixture sources | Counts in the build report that match the fixtures |
+| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 17 tables equal the rows in `tests/fixtures/expected.tsv` |
+| `two_runs_give_the_same_rows` | 2 runs on the same fixtures | Same rows in each table |
+| `report_counts_match_the_fixtures` | Fixture sources | Counts in the build report that match the fixtures |
 
 The fixtures hold:
 
 - 1 JMdict entry for each case of `kanji_links.rs`
 - JMdict entries with readings, senses, glosses, restrictions, and tags of each category, for the
   cases of `words.rs`
-- the KanjiVG entries of 語, 吾, and 休
+- KanjiVG entries of 語, 吾, and 休
 - 1 KanjiVG entry with a direct component that has no KanjiVG entry
 - 1 KanjiVG entry with the direct component ⻞
 - 1 kanji of a word with no KanjiVG entry

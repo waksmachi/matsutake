@@ -1,9 +1,9 @@
-//! The build checks on a full build from `sources/`. `cargo test` does not run these
+//! Build checks on a full build from `sources/`. `cargo test` does not run these
 //! checks. To run them after a full build, use:
 //!
 //! cargo test -p ingest --test build_checks -- --ignored
 //!
-//! The environment variable `CONTENT_DB` gives the path of `content.db`, and `JMDICT` gives the path
+//! Environment variable `CONTENT_DB` gives the path of `content.db`, and `JMDICT` gives the path
 //! of `JMdict_e.gz`. The defaults are `out/content.db` and `sources/JMdict_e.gz` in the crate.
 
 use std::collections::{HashMap, HashSet};
@@ -81,7 +81,7 @@ fn golden_component_edges_exist() {
     );
 }
 
-/// The body of `JMdict_e.gz`: the decompressed text after the DTD, whose comments name the
+/// Body of `JMdict_e.gz`: the decompressed text after the DTD, whose comments name the
 /// elements too. The checks count the elements without the parser of the ingest crate.
 fn jmdict_xml() -> String {
     let mut xml = String::new();

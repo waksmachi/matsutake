@@ -4,7 +4,7 @@ use jpdag::normalize::normalize;
 
 use crate::words::KanjiFormRow;
 
-/// The code points with the Unicode property `Unified_Ideograph`, from `PropList-18.0.0.txt`.
+/// Code points with the Unicode property `Unified_Ideograph`, from `PropList-18.0.0.txt`.
 const UNIFIED_IDEOGRAPH: [(u32, u32); 16] = [
     (0x3400, 0x4DBF),
     (0x4E00, 0x9FFF),
@@ -31,7 +31,7 @@ pub fn is_unified_ideograph(c: char) -> bool {
         .any(|&(first, last)| (first..=last).contains(&c))
 }
 
-/// The kanji of `text`, in the order of the text: each normalized code point with the property
+/// Kanji of `text`, in text order: each normalized code point with the property
 /// `Unified_Ideograph`, without duplicates.
 pub fn kanji_of(text: &str) -> Vec<char> {
     let mut kanji = Vec::new();
@@ -46,7 +46,7 @@ pub fn kanji_of(text: &str) -> Vec<char> {
     kanji
 }
 
-/// The `kanji_form_kanji` rows, each as (kanji_form_id, kanji). Tags and `uk` do not filter the
+/// `kanji_form_kanji` rows, each as (kanji_form_id, kanji). Tags and `uk` do not filter the
 /// links.
 pub fn link(kanji_forms: &[KanjiFormRow]) -> Vec<(u32, char)> {
     kanji_forms

@@ -11,19 +11,19 @@ use crate::source::Source;
 
 #[derive(Debug, Default)]
 pub struct KanjiVg {
-    /// The direct components of each KanjiVG entry, in the order of the groups.
+    /// Direct components of each KanjiVG entry, in group order.
     pub entries: HashMap<char, Vec<char>>,
-    /// The groups whose `kvg:element` value does not give exactly 1 code point after normalization.
+    /// Groups whose `kvg:element` value does not give exactly 1 code point after normalization.
     pub unresolved: Vec<UnresolvedGroup>,
-    /// The date in the header comment "This file was generated on YYYY-MM-DD".
+    /// Date in the header comment "This file was generated on YYYY-MM-DD".
     pub version: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnresolvedGroup {
-    /// The character of the KanjiVG entry that holds the group.
+    /// Character of the KanjiVG entry that holds the group.
     pub kanji: char,
-    /// The `kvg:element` value of the group.
+    /// `kvg:element` value of the group.
     pub element: String,
 }
 
@@ -89,7 +89,7 @@ fn attribute(element: &BytesStart, key: &str) -> Option<String> {
         })
 }
 
-/// The code point of a `<kanji>` element, for example U+8A9E for `kvg:kanji_08a9e`. An `id` with
+/// Code point of a `<kanji>` element, for example U+8A9E for `kvg:kanji_08a9e`. An `id` with
 /// a suffix after the code point, for example `kvg:kanji_08a9e-Kaisho`, gives no code point.
 fn entry_code_point(id: &str) -> Option<char> {
     let hex = id.strip_prefix("kvg:kanji_")?;
@@ -99,14 +99,14 @@ fn entry_code_point(id: &str) -> Option<char> {
     char::from_u32(u32::from_str_radix(hex, 16).ok()?)
 }
 
-/// The code point of the KanjiVG entry of a `<kanji>` element, or `None` if stage 3 ignores the
+/// Code point of the KanjiVG entry of a `<kanji>` element, or `None` if stage 3 ignores the
 /// element.
 fn entry_kanji(element: &BytesStart) -> Option<char> {
     let c = entry_code_point(&attribute(element, "id")?)?;
     (normalize(c) == c.to_string()).then_some(c)
 }
 
-/// The date in "This file was generated on YYYY-MM-DD", if the comment holds it.
+/// Date in "This file was generated on YYYY-MM-DD", if the comment holds it.
 fn generated_date(comment: &str) -> Option<String> {
     const PREFIX: &str = "This file was generated on ";
     let rest = &comment[comment.find(PREFIX)? + PREFIX.len()..];

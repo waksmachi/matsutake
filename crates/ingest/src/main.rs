@@ -63,7 +63,7 @@ fn parse_args() -> Result<Args> {
     })
 }
 
-/// The data of the build report, in addition to the rows.
+/// Data of the build report, in addition to the rows.
 struct Findings {
     set: components::CharacterSet,
     kvg_unresolved: Vec<kanjivg::UnresolvedGroup>,

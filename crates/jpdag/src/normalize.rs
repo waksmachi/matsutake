@@ -3,7 +3,7 @@
 
 use unicode_normalization::UnicodeNormalization;
 
-/// The code points that NFKC does not merge with the unified ideograph that looks identical.
+/// Code points that NFKC does not merge with the unified ideograph that looks identical.
 const MERGE: [(char, char); 5] = [
     ('\u{2ED6}', '\u{961D}'), // ⻖ → 阝
     ('\u{2ECF}', '\u{961D}'), // ⻏ → 阝

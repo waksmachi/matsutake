@@ -1,9 +1,9 @@
-//! The schema of `content.db`.
+//! Schema of `content.db`.
 
-/// The value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
+/// Value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
 pub const SCHEMA_VERSION: i32 = 1;
 
-/// The tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
+/// Tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
 pub const CREATE_TABLES: &str = "
 CREATE TABLE word (
   id INTEGER PRIMARY KEY                                    -- JMdict ent_seq
@@ -110,7 +110,7 @@ CREATE TABLE sense_tag (
 
 CREATE TABLE source (
   name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, or Kanji alive
-  version     TEXT,                                         -- the date of the file
+  version     TEXT,                                         -- the file's date
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
 ) STRICT;

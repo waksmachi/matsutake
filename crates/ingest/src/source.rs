@@ -39,7 +39,7 @@ pub struct LineCounter<R> {
 }
 
 impl<R> LineCounter<R> {
-    /// The line of the next byte that the user will consume. The first line is 1.
+    /// Line of the next byte that the user will consume. The first line is 1.
     pub fn line(&self) -> u64 {
         self.line
     }

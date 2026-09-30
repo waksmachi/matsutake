@@ -42,7 +42,7 @@ pub struct TagRow {
     pub id: u32,
     pub category: Category,
     pub name: String,
-    /// The text that the DTD gives for the entity, or `None` if the DTD does not declare it.
+    /// Text that the DTD gives for the entity, or `None` if the DTD does not declare it.
     pub description: Option<String>,
 }
 
@@ -54,7 +54,7 @@ pub struct SkippedRestriction {
     pub text: String,
 }
 
-/// The rows of the entry tables and the tag tables. Each pair is (the row id, the other id).
+/// Rows of the entry tables and the tag tables. Each pair is (the row id, the other id).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct EntryRows {
     pub words: Vec<u32>,
@@ -79,7 +79,7 @@ pub struct EntryRows {
 }
 
 impl EntryRows {
-    /// The tags whose entity the DTD does not declare.
+    /// Tags whose entity the DTD does not declare.
     pub fn undeclared_tags(&self) -> impl Iterator<Item = &TagRow> {
         self.tags.iter().filter(|t| t.description.is_none())
     }

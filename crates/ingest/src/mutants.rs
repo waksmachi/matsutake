@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use anyhow::{Result, bail};
 use jpdag::normalize::normalize_char;
 
-/// The rows of `data/mutants.tsv`.
+/// Rows of `data/mutants.tsv`.
 pub const MUTANTS: &str = include_str!("../data/mutants.tsv");
 
 /// Reads a list of mutants, and gives each row as (mutant, base) after normalization (steps 1 to 5
@@ -30,7 +30,7 @@ pub fn read(text: &str) -> Result<Vec<(char, char)>> {
             bail!("mutants.tsv line {n}: more than 2 columns: {line:?}");
         }
         if mutant == base {
-            bail!("mutants.tsv line {n}: the mutant and the base are the same character, {base}");
+            bail!("mutants.tsv line {n}: the mutant and base are the same character, {base}");
         }
         if !seen.insert((mutant, base)) {
             bail!("mutants.tsv line {n}: the row {mutant} → {base} occurs 2 times");
@@ -40,7 +40,7 @@ pub fn read(text: &str) -> Result<Vec<(char, char)>> {
     Ok(rows)
 }
 
-/// The normalized character of a column that holds exactly 1 character.
+/// Normalized character of a column that holds exactly 1 character.
 fn single(column: &str) -> Option<char> {
     let mut chars = column.trim().chars();
     match (chars.next(), chars.next()) {
@@ -49,7 +49,7 @@ fn single(column: &str) -> Option<char> {
     }
 }
 
-/// The mutants that are not a KanjiVG component, in the order of the list (step 6).
+/// Mutants that are not a KanjiVG component, in list order (step 6).
 pub fn not_kanjivg_components(rows: &[(char, char)], components: &HashSet<char>) -> Vec<char> {
     let mut result = Vec::new();
     for &(mutant, _) in rows {

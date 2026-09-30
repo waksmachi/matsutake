@@ -4,22 +4,22 @@ use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Default)]
 pub struct CharacterSet {
-    /// The characters of the `character` rows.
+    /// Characters of the `character` rows.
     pub characters: BTreeSet<char>,
-    /// The `character_component` rows, each as (character, direct component).
+    /// `character_component` rows, each as (character, direct component).
     pub character_components: BTreeSet<(char, char)>,
-    /// The `mutant` rows, each as (mutant, base).
+    /// `mutant` rows, each as (mutant, base).
     pub mutants: BTreeSet<(char, char)>,
-    /// The number of characters with a KanjiVG entry.
+    /// Number of characters with a KanjiVG entry.
     pub with_entry: usize,
-    /// The kanji of a word with no KanjiVG entry.
+    /// Kanji of a word with no KanjiVG entry.
     pub uncovered_word_kanji: BTreeSet<char>,
-    /// The direct components with no KanjiVG entry.
+    /// Direct components with no KanjiVG entry.
     pub uncovered_components: BTreeSet<char>,
 }
 
 impl CharacterSet {
-    /// The number of uncovered characters: the characters with no KanjiVG entry.
+    /// Number of uncovered characters: the characters with no KanjiVG entry.
     pub fn uncovered(&self) -> usize {
         self.characters.len() - self.with_entry
     }
