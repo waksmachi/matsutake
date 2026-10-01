@@ -219,13 +219,60 @@ fn sources_have_versions() {
         .unwrap()
         .collect::<rusqlite::Result<_>>()
         .unwrap();
-    for name in ["JMdict", "KanjiVG", "Kanji alive"] {
+    for name in ["JMdict", "KanjiVG", "Kanji alive", "KANJIDIC2"] {
         assert!(sources.contains_key(name), "no source row for {name}");
     }
-    for name in ["JMdict", "KanjiVG"] {
+    for name in ["JMdict", "KanjiVG", "KANJIDIC2"] {
         assert!(
             sources[name].is_some(),
             "the source row of {name} has no version"
         );
     }
+}
+
+fn strings(conn: &Connection, sql: &str, character: char) -> Vec<String> {
+    conn.prepare(sql)
+        .unwrap()
+        .query_map([character as u32], |r| r.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap()
+}
+
+fn meanings(conn: &Connection, character: char) -> Vec<String> {
+    strings(
+        conn,
+        "SELECT text FROM character_meaning WHERE character_id = ?1 ORDER BY position",
+        character,
+    )
+}
+
+/// Readings of `character`, each as its type, a space, and its text.
+fn readings(conn: &Connection, character: char) -> Vec<String> {
+    strings(
+        conn,
+        "SELECT type || ' ' || text FROM character_reading WHERE character_id = ?1 ORDER BY position",
+        character,
+    )
+}
+
+#[test]
+#[ignore]
+fn golden_character_details_exist() {
+    let conn = content_db();
+    assert_eq!(meanings(&conn, '語'), ["word", "speech", "language"]);
+    assert_eq!(
+        readings(&conn, '語'),
+        ["on ゴ", "kun かた.る", "kun かた.らう"]
+    );
+}
+
+#[test]
+#[ignore]
+fn mutants_keep_their_radical_meanings() {
+    let conn = content_db();
+    assert!(meanings(&conn, '氵').contains(&"water".to_owned()));
+    // ⻞ has no KANJIDIC2 entry.
+    assert!(meanings(&conn, '⻞').is_empty());
+    assert!(readings(&conn, '⻞').is_empty());
 }

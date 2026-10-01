@@ -8,9 +8,11 @@ use rusqlite::Connection;
 use rusqlite::types::ValueRef;
 
 /// Tables of `content.db`, in schema order.
-const TABLES: [&str; 17] = [
+const TABLES: [&str; 19] = [
     "word",
     "character",
+    "character_meaning",
+    "character_reading",
     "character_component",
     "written_form_kanji",
     "mutant",
@@ -29,8 +31,10 @@ const TABLES: [&str; 17] = [
 ];
 
 /// Columns that hold a code point. The dump shows the character.
-const CHARACTER_COLUMNS: [(&str, &str); 7] = [
+const CHARACTER_COLUMNS: [(&str, &str); 9] = [
     ("character", "id"),
+    ("character_meaning", "character_id"),
+    ("character_reading", "character_id"),
     ("character_component", "character_id"),
     ("character_component", "component_id"),
     ("written_form_kanji", "kanji_id"),
@@ -53,6 +57,8 @@ fn run_ingest(out: &Path) -> String {
         .arg(fixture("JMdict_e.xml"))
         .arg("--kanjivg")
         .arg(fixture("kanjivg.xml"))
+        .arg("--kanjidic")
+        .arg(fixture("kanjidic2.xml"))
         .arg("--out")
         .arg(out)
         .output()
@@ -158,6 +164,7 @@ fn report_counts_match_the_fixtures() {
         "  JMdict               2026-09-28",
         "  KanjiVG              2025-08-16",
         "  Kanji alive          none (data/mutants.tsv holds its data)",
+        "  KANJIDIC2            2026-10-01",
         "Characters with a KanjiVG entry: 11",
         "Uncovered characters: 40",
         "  𠮟 U+20B9F",
@@ -168,6 +175,11 @@ fn report_counts_match_the_fixtures() {
         "  ent_seq 1000520: <re_restr>掌",
         "  ent_seq 1000520: <stagk>腕",
         "KanjiVG groups whose kvg:element value does not give exactly 1 code point after normalization: 0",
+        "Characters with a KANJIDIC2 entry: 3",
+        "KANJIDIC2 entries that stage 6 ignores: 2",
+        "Mutants with no KANJIDIC2 entry: 7",
+        "  亻 U+4EBB",
+        "Characters with a KANJIDIC2 entry and no English meaning: 0",
     ] {
         assert!(
             report.lines().any(|l| l == line),

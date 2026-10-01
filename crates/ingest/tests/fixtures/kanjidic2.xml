@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Entries of KANJIDIC2 for the integration test, without their <dic_number> and <query_code>
+     elements. 亜 is not in the character set of the fixtures, and U+FA19 is a compatibility
+     ideograph. -->
+<kanjidic2>
+<header>
+<file_version>4</file_version>
+<database_version>2026-274</database_version>
+<date_of_creation>2026-10-01</date_of_creation>
+</header>
+<character>
+<literal>語</literal>
+<codepoint>
+<cp_value cp_type="ucs">8a9e</cp_value>
+<cp_value cp_type="jis208">1-24-76</cp_value>
+</codepoint>
+<radical>
+<rad_value rad_type="classical">149</rad_value>
+</radical>
+<misc>
+<grade>2</grade>
+<stroke_count>14</stroke_count>
+<freq>301</freq>
+<jlpt>4</jlpt>
+</misc>
+<reading_meaning>
+<rmgroup>
+<reading r_type="pinyin">yu3</reading>
+<reading r_type="pinyin">yu4</reading>
+<reading r_type="korean_r">eo</reading>
+<reading r_type="korean_h">어</reading>
+<reading r_type="vietnam">Ngữ</reading>
+<reading r_type="vietnam">Ngứ</reading>
+<reading r_type="ja_on">ゴ</reading>
+<reading r_type="ja_kun">かた.る</reading>
+<reading r_type="ja_kun">かた.らう</reading>
+<meaning>word</meaning>
+<meaning>speech</meaning>
+<meaning>language</meaning>
+<meaning m_lang="fr">langage</meaning>
+<meaning m_lang="fr">mot</meaning>
+<meaning m_lang="fr">raconter</meaning>
+<meaning m_lang="es">palabra</meaning>
+<meaning m_lang="es">discurso</meaning>
+<meaning m_lang="es">lenguaje</meaning>
+<meaning m_lang="es">hablar</meaning>
+<meaning m_lang="es">conversar</meaning>
+<meaning m_lang="es">narrar</meaning>
+<meaning m_lang="pt">palavra</meaning>
+<meaning m_lang="pt">discurso</meaning>
+<meaning m_lang="pt">língua</meaning>
+</rmgroup>
+</reading_meaning>
+</character>
+<character>
+<literal>吾</literal>
+<codepoint>
+<cp_value cp_type="ucs">543e</cp_value>
+<cp_value cp_type="jis208">1-24-67</cp_value>
+</codepoint>
+<radical>
+<rad_value rad_type="classical">30</rad_value>
+<rad_value rad_type="nelson_c">1</rad_value>
+</radical>
+<misc>
+<grade>9</grade>
+<stroke_count>7</stroke_count>
+<freq>1828</freq>
+<jlpt>1</jlpt>
+</misc>
+<reading_meaning>
+<rmgroup>
+<reading r_type="pinyin">wu2</reading>
+<reading r_type="korean_r">o</reading>
+<reading r_type="korean_h">오</reading>
+<reading r_type="vietnam">Ngô</reading>
+<reading r_type="ja_on">ゴ</reading>
+<reading r_type="ja_kun">われ</reading>
+<reading r_type="ja_kun">わが-</reading>
+<reading r_type="ja_kun">あ-</reading>
+<meaning>I</meaning>
+<meaning>my</meaning>
+<meaning>our</meaning>
+<meaning>one's own</meaning>
+<meaning m_lang="fr">moi</meaning>
+<meaning m_lang="fr">mon</meaning>
+<meaning m_lang="fr">notre</meaning>
+<meaning m_lang="fr">son propre</meaning>
+<meaning m_lang="es">yo</meaning>
+<meaning m_lang="es">mi</meaning>
+<meaning m_lang="es">nuestro</meaning>
+</rmgroup>
+<nanori>あ</nanori>
+<nanori>あが</nanori>
+</reading_meaning>
+</character>
+<character>
+<literal>休</literal>
+<codepoint>
+<cp_value cp_type="ucs">4f11</cp_value>
+<cp_value cp_type="jis208">1-21-57</cp_value>
+</codepoint>
+<radical>
+<rad_value rad_type="classical">9</rad_value>
+</radical>
+<misc>
+<grade>1</grade>
+<stroke_count>6</stroke_count>
+<freq>642</freq>
+<jlpt>4</jlpt>
+</misc>
+<reading_meaning>
+<rmgroup>
+<reading r_type="pinyin">xiu1</reading>
+<reading r_type="korean_r">hyu</reading>
+<reading r_type="korean_h">휴</reading>
+<reading r_type="vietnam">Hưu</reading>
+<reading r_type="ja_on">キュウ</reading>
+<reading r_type="ja_kun">やす.む</reading>
+<reading r_type="ja_kun">やす.まる</reading>
+<reading r_type="ja_kun">やす.める</reading>
+<meaning>rest</meaning>
+<meaning>day off</meaning>
+<meaning>retire</meaning>
+<meaning>sleep</meaning>
+<meaning m_lang="fr">repos</meaning>
+<meaning m_lang="fr">jour de repos</meaning>
+<meaning m_lang="fr">se coucher</meaning>
+<meaning m_lang="fr">dormir</meaning>
+<meaning m_lang="es">descanso</meaning>
+<meaning m_lang="es">descansar</meaning>
+<meaning m_lang="es">tomarse un descanso</meaning>
+<meaning m_lang="es">estar descansado</meaning>
+<meaning m_lang="es">dar descanso</meaning>
+<meaning m_lang="pt">descanso</meaning>
+<meaning m_lang="pt">dia desligado</meaning>
+<meaning m_lang="pt">aposentar</meaning>
+<meaning m_lang="pt">sono</meaning>
+</rmgroup>
+</reading_meaning>
+</character>
+<character>
+<literal>亜</literal>
+<codepoint>
+<cp_value cp_type="ucs">4e9c</cp_value>
+<cp_value cp_type="jis208">1-16-01</cp_value>
+</codepoint>
+<radical>
+<rad_value rad_type="classical">7</rad_value>
+<rad_value rad_type="nelson_c">1</rad_value>
+</radical>
+<misc>
+<grade>8</grade>
+<stroke_count>7</stroke_count>
+<variant var_type="jis208">1-48-19</variant>
+<freq>1509</freq>
+<jlpt>1</jlpt>
+</misc>
+<reading_meaning>
+<rmgroup>
+<reading r_type="pinyin">ya4</reading>
+<reading r_type="korean_r">a</reading>
+<reading r_type="korean_h">아</reading>
+<reading r_type="vietnam">A</reading>
+<reading r_type="vietnam">Á</reading>
+<reading r_type="ja_on">ア</reading>
+<reading r_type="ja_kun">つ.ぐ</reading>
+<meaning>Asia</meaning>
+<meaning>rank next</meaning>
+<meaning>come after</meaning>
+<meaning>-ous</meaning>
+<meaning m_lang="fr">Asie</meaning>
+<meaning m_lang="fr">suivant</meaning>
+<meaning m_lang="fr">sub-</meaning>
+<meaning m_lang="fr">sous-</meaning>
+<meaning m_lang="es">pref. para indicar</meaning>
+<meaning m_lang="es">venir después de</meaning>
+<meaning m_lang="es">Asia</meaning>
+<meaning m_lang="pt">Ásia</meaning>
+<meaning m_lang="pt">próxima</meaning>
+<meaning m_lang="pt">o que vem depois</meaning>
+<meaning m_lang="pt">-ous</meaning>
+</rmgroup>
+<nanori>や</nanori>
+<nanori>つぎ</nanori>
+<nanori>つぐ</nanori>
+</reading_meaning>
+</character>
+<character>
+<literal>神</literal>
+<codepoint>
+<cp_value cp_type="ucs">FA19</cp_value>
+<cp_value cp_type="jis213">1-89-28</cp_value>
+</codepoint>
+<radical>
+<rad_value rad_type="classical">113</rad_value>
+</radical>
+<misc>
+<grade>10</grade>
+<stroke_count>10</stroke_count>
+<variant var_type="jis208">1-31-32</variant>
+<variant var_type="ucs">795E</variant>
+</misc>
+<reading_meaning>
+<rmgroup>
+<reading r_type="pinyin">shen2</reading>
+<reading r_type="ja_on">シン</reading>
+<reading r_type="ja_on">ジン</reading>
+<reading r_type="ja_kun">かみ</reading>
+<reading r_type="ja_kun">こう</reading>
+<reading r_type="ja_kun">たましい</reading>
+<meaning>spirit</meaning>
+</rmgroup>
+</reading_meaning>
+</character>
+</kanjidic2>

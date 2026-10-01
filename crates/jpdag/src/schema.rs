@@ -1,7 +1,7 @@
 //! Schema of `content.db`.
 
 /// Value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
-pub const SCHEMA_VERSION: i32 = 1;
+pub const SCHEMA_VERSION: i32 = 2;
 
 /// Tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
 pub const CREATE_TABLES: &str = "
@@ -12,6 +12,21 @@ CREATE TABLE word (
 CREATE TABLE character (
   id INTEGER PRIMARY KEY                                    -- code point after normalization
 ) STRICT;
+
+CREATE TABLE character_meaning (
+  character_id INTEGER NOT NULL REFERENCES character(id),
+  position     INTEGER NOT NULL,
+  text         TEXT NOT NULL,
+  PRIMARY KEY (character_id, position)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE character_reading (
+  character_id INTEGER NOT NULL REFERENCES character(id),
+  position     INTEGER NOT NULL,
+  type         TEXT NOT NULL CHECK (type IN ('on', 'kun')),
+  text         TEXT NOT NULL,
+  PRIMARY KEY (character_id, position)
+) STRICT, WITHOUT ROWID;
 
 CREATE TABLE character_component (
   character_id INTEGER NOT NULL REFERENCES character(id),
@@ -109,7 +124,7 @@ CREATE TABLE sense_tag (
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE source (
-  name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, or Kanji alive
+  name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, or KANJIDIC2
   version     TEXT,                                         -- the file's date
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
