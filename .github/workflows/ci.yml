@@ -65,6 +65,7 @@ jobs:
           cargo run --release -p ingest --
           --jmdict sources/JMdict_e.gz
           --kanjivg sources/kanjivg-*.xml.gz
+          --kanjidic sources/kanjidic2.xml.gz
           --out out
       - name: Add the build report to the job summary
         run: |

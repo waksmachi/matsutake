@@ -12,6 +12,7 @@ kanjivg_file="kanjivg-${kanjivg_release#r}.xml.gz"
 
 sources=(
   "JMdict_e.gz https://www.edrdg.org/pub/Nihongo/JMdict_e.gz"
+  "kanjidic2.xml.gz https://www.edrdg.org/kanjidic/kanjidic2.xml.gz"
   "$kanjivg_file https://github.com/KanjiVG/kanjivg/releases/download/$kanjivg_release/$kanjivg_file"
 )
 

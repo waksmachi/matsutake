@@ -1,4 +1,4 @@
-//! Stage 6: write `content.db`.
+//! Stage 7: write `content.db`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ pub struct Source {
     pub attribution: &'static str,
 }
 
-/// Rows of the 17 tables. Each character is a code point.
+/// Rows of the 19 tables. Each character is a code point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Rows {
     /// Rows of `word`, the entry tables, and the tag tables.
@@ -26,6 +26,10 @@ pub struct Rows {
     /// Each row as (written_form_id, kanji_id).
     pub written_form_kanji: Vec<(u32, u32)>,
     pub characters: Vec<u32>,
+    /// Each row as (character_id, position, text).
+    pub character_meanings: Vec<(u32, u32, String)>,
+    /// Each row as (character_id, position, type, text).
+    pub character_readings: Vec<(u32, u32, &'static str, String)>,
     /// Each row as (character_id, component_id).
     pub character_components: Vec<(u32, u32)>,
     /// Each row as (mutant_id, base_id).
@@ -35,11 +39,13 @@ pub struct Rows {
 
 impl Rows {
     /// Number of rows in each table, in schema order.
-    pub fn counts(&self) -> [(&'static str, usize); 17] {
+    pub fn counts(&self) -> [(&'static str, usize); 19] {
         let e = &self.entries;
         [
             ("word", e.words.len()),
             ("character", self.characters.len()),
+            ("character_meaning", self.character_meanings.len()),
+            ("character_reading", self.character_readings.len()),
             ("character_component", self.character_components.len()),
             ("written_form_kanji", self.written_form_kanji.len()),
             ("mutant", self.mutants.len()),
@@ -99,6 +105,14 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     let mut insert = tx.prepare("INSERT INTO character (id) VALUES (?1)")?;
     for id in &rows.characters {
         insert.execute([id])?;
+    }
+    let mut insert = tx.prepare("INSERT INTO character_meaning VALUES (?1, ?2, ?3)")?;
+    for (character_id, position, text) in &rows.character_meanings {
+        insert.execute(params![character_id, position, text])?;
+    }
+    let mut insert = tx.prepare("INSERT INTO character_reading VALUES (?1, ?2, ?3, ?4)")?;
+    for (character_id, position, kind, text) in &rows.character_readings {
+        insert.execute(params![character_id, position, kind, text])?;
     }
     let mut insert = tx.prepare("INSERT INTO written_form VALUES (?1, ?2, ?3, ?4)")?;
     for k in &e.written_forms {
@@ -260,6 +274,11 @@ mod tests {
             },
             written_form_kanji: vec![(1, 0x4F11)],
             characters: vec![0x4EBA, 0x4EBB, 0x4F11, 0x6728],
+            character_meanings: vec![(0x4F11, 1, "rest".into()), (0x4F11, 2, "day off".into())],
+            character_readings: vec![
+                (0x4F11, 1, "on", "キュウ".into()),
+                (0x4F11, 2, "kun", "やす.む".into()),
+            ],
             character_components: vec![(0x4F11, 0x4EBB), (0x4F11, 0x6728)],
             mutants: vec![(0x4EBB, 0x4EBA)],
             sources: vec![Source {
@@ -277,9 +296,13 @@ mod tests {
         write(&dir, &Rows::default()).unwrap();
         let conn = Connection::open(dir.join("content.db")).unwrap();
         let tables = names(&conn, "table");
-        assert_eq!(tables.len(), 17, "{tables:?}");
+        assert_eq!(tables.len(), 19, "{tables:?}");
         assert_eq!(names(&conn, "index").len(), 8);
         assert_eq!(columns(&conn, "mutant"), ["mutant_id", "base_id"]);
+        assert_eq!(
+            columns(&conn, "character_reading"),
+            ["character_id", "position", "type", "text"]
+        );
         assert_eq!(
             columns(&conn, "reading"),
             ["id", "word_id", "position", "text", "no_kanji"]
@@ -305,6 +328,20 @@ mod tests {
         assert_eq!(strings(&conn, "SELECT text FROM written_form"), ["休む"]);
         assert_eq!(strings(&conn, "SELECT note FROM sense"), ["a note"]);
         assert_eq!(strings(&conn, "SELECT category FROM tag"), ["pos"]);
+        assert_eq!(
+            strings(
+                &conn,
+                "SELECT text FROM character_meaning ORDER BY position"
+            ),
+            ["rest", "day off"]
+        );
+        assert_eq!(
+            strings(
+                &conn,
+                "SELECT type FROM character_reading ORDER BY position"
+            ),
+            ["on", "kun"]
+        );
         assert_eq!(strings(&conn, "SELECT version FROM source"), ["2026-09-28"]);
     }
 

@@ -51,6 +51,28 @@ character	鳥
 character	﨑
 character	𠂉
 character	𠮟
+character_meaning	休	1	rest
+character_meaning	休	2	day off
+character_meaning	休	3	retire
+character_meaning	休	4	sleep
+character_meaning	吾	1	I
+character_meaning	吾	2	my
+character_meaning	吾	3	our
+character_meaning	吾	4	one's own
+character_meaning	語	1	word
+character_meaning	語	2	speech
+character_meaning	語	3	language
+character_reading	休	1	on	キュウ
+character_reading	休	2	kun	やす.む
+character_reading	休	3	kun	やす.まる
+character_reading	休	4	kun	やす.める
+character_reading	吾	1	on	ゴ
+character_reading	吾	2	kun	われ
+character_reading	吾	3	kun	わが-
+character_reading	吾	4	kun	あ-
+character_reading	語	1	on	ゴ
+character_reading	語	2	kun	かた.る
+character_reading	語	3	kun	かた.らう
 character_component	休	亻
 character_component	休	木
 character_component	吾	五
@@ -226,6 +248,7 @@ sense_tag	27	2
 sense_tag	28	12
 sense_tag	28	2
 source	JMdict	2026-09-28	CC BY-SA 4.0	…
+source	KANJIDIC2	2026-10-01	CC BY-SA 4.0	…
 source	Kanji alive	NULL	CC BY 4.0	…
 source	KanjiVG	2025-08-16	CC BY-SA 3.0	…
 tag	1	ke_inf	rK	rarely used kanji form
