@@ -1,4 +1,4 @@
-# Ingest: JMdict and components
+# Ingest: JMdict, components, and kanji details
 
 This document describes the design of the `ingest` crate. `ingest` populates `content.db`, the
 database of the app, from free public data sources.
@@ -17,11 +17,13 @@ The `ingest` crate builds the graph in stages.
 1. *JMdict* gives the words, with their written forms, readings, senses, glosses, and tags.
 2. *KanjiVG* gives the component tree of each character.
 3. `data/mutants.tsv`, a list in this repository, gives the mutant mapping.
-4. Graph is written from memory into `content.db`.
+4. *KANJIDIC2* gives the details of each character of the graph: its meanings and its readings.
+   KANJIDIC2 adds no character to the graph.
+5. Graph is written from memory into `content.db`.
 
 ## 2. Scope
 
-This design covers 17 tables in 4 groups.
+This design covers 19 tables in 5 groups.
 
 The graph:
 
@@ -32,6 +34,13 @@ The graph:
 | `character` | Each character that the other tables refer to |
 | `character_component` | Direct components of each character |
 | `mutant` | Base of each mutant |
+
+The details of each character, from KANJIDIC2:
+
+| Table | Content |
+| --- | --- |
+| `character_meaning` | English meanings of each character (`<meaning>`) |
+| `character_reading` | On readings and kun readings of each character (`<reading>`) |
 
 The structure of each JMdict entry:
 
@@ -67,6 +76,11 @@ Later designs add these items:
 - other text of a sense: `<lsource>`, `<xref>`, and `<ant>`
 - stroke geometry of each KanjiVG entry, so the app can draw a character and show a tooltip
   for each component when the user points at its strokes
+- other data of a KANJIDIC2 entry: the name readings (`<nanori>`), the names of a radical
+  (`<rad_name>`), the radical number, the variants, and the dictionary references
+- characters of KANJIDIC2 that no word and no component uses
+- frequency of each character, for lists in order of how common a character is. This design does
+  not read the `<freq>` rank of KANJIDIC2.
 
 ## 3. Terms
 
@@ -87,6 +101,10 @@ Later designs add these items:
 | Mutant | A variant of a kanji that occurs as a component, for example 氵 |
 | Base | Kanji of a mutant, for example 水 for 氵 |
 | Uncovered character | A character with no KanjiVG entry, because KanjiVG does not cover it. An uncovered character has no `character_component` rows. |
+| KANJIDIC2 entry | A `<character>` element of KANJIDIC2 that stage 6 keeps. A KANJIDIC2 entry describes 1 character. |
+| Meaning | An English word or phrase for 1 character, for example "language" for 語. Each `<meaning>` element with no `m_lang` attribute gives 1 meaning. |
+| On reading | A reading of a character that comes from Chinese, in katakana, for example ゴ for 語 |
+| Kun reading | A native Japanese reading of a character, in hiragana, for example かた.る for 語. A `.` comes before the okurigana, and a `-` marks a prefix or a suffix. |
 
 ## 4. Datasources
 
@@ -94,15 +112,16 @@ Later designs add these items:
 | --- | --- | --- | --- | --- |
 | JMdict | `JMdict_e.gz` | EDRDG | CC BY-SA 4.0 | Entries, written forms, readings, senses, and tags |
 | KanjiVG | `kanjivg-YYYYMMDD.xml.gz`, from the GitHub release | KanjiVG project | CC BY-SA 3.0 | Components of each character |
+| KANJIDIC2 | `kanjidic2.xml.gz` | EDRDG | CC BY-SA 4.0 | Meanings and readings of each character |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
-KanjiVG release, for example r20250816. JMdict has no releases, so the script downloads the current
-file. EDRDG publishes a new JMdict file each day.
+KanjiVG release, for example r20250816. JMdict and KANJIDIC2 have no releases, so the script
+downloads the current files. EDRDG publishes a new file of each on most days.
 
 `data/mutants.tsv` is not a download. The first 19 rows of the file come from `japanese-radicals.csv`
 of Kanji alive (CC BY 4.0), and the file's header credits Kanji alive (section 6.5).
 
-`content.db` is a derivative of JMdict and KanjiVG, so CC BY-SA applies to it. The `source` table
+`content.db` is a derivative of JMdict, KanjiVG, and KANJIDIC2, so CC BY-SA applies to it. The `source` table
 holds the attribution that each licence asks for, so the app can show it.
 
 The `ingest` binary reads local files only and has no network code. The arguments of the binary give
@@ -121,6 +140,21 @@ CREATE TABLE word (
 CREATE TABLE character (
   id INTEGER PRIMARY KEY                                    -- code point after normalization
 ) STRICT;
+
+CREATE TABLE character_meaning (
+  character_id INTEGER NOT NULL REFERENCES character(id),
+  position     INTEGER NOT NULL,
+  text         TEXT NOT NULL,
+  PRIMARY KEY (character_id, position)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE character_reading (
+  character_id INTEGER NOT NULL REFERENCES character(id),
+  position     INTEGER NOT NULL,
+  type         TEXT NOT NULL CHECK (type IN ('on', 'kun')),
+  text         TEXT NOT NULL,
+  PRIMARY KEY (character_id, position)
+) STRICT, WITHOUT ROWID;
 
 CREATE TABLE character_component (
   character_id INTEGER NOT NULL REFERENCES character(id),
@@ -218,7 +252,7 @@ CREATE TABLE sense_tag (
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE source (
-  name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, or Kanji alive
+  name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, or KANJIDIC2
   version     TEXT,                                         -- the file's date
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
@@ -239,6 +273,12 @@ the other direction: a word by its written form, the words that use a kanji, the
 contain a component, the mutants of a base, and the written forms, readings, or senses with a tag.
 
 `word` is represented by its JMdict `ent_seq`, and `character` is its code point.
+
+`content.db` does not record whether a character has a KANJIDIC2 entry: a character with no entry,
+and a character whose entry has no meaning and no reading, look the same. `character_reading` has
+no index on `text`: a search for characters by their reading is the work of a later design.
+
+This schema is `SCHEMA_VERSION` 2. Version 1 had no KANJIDIC2 tables.
 
 Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
 the position, so 2 builds from the same files give the same ids. The ids change when JMdict changes.
@@ -272,7 +312,10 @@ so they stay 2 characters, and `mutant` links them.
        │                  character set
        │                        │
        │                        ▼
-       └──────────────► 6 Write content.db
+       │                6 Read KANJIDIC2 ◄────── kanjidic2.xml.gz
+       │                        │
+       │                        ▼
+       └──────────────► 7 Write content.db
 ```
 
 | Stage | Input | Output |
@@ -282,7 +325,8 @@ so they stay 2 characters, and `mutant` links them.
 | 3. Parse KanjiVG | `kanjivg-*.xml.gz` | Direct components of each KanjiVG entry |
 | 4. Read the mutants | `data/mutants.tsv`, and the KanjiVG components of stage 3 | Candidate `mutant` rows |
 | 5. Complete the character set | Stages 2, 3, and 4 | `character`, `character_component`, and `mutant` rows |
-| 6. Write `content.db` | Stages 1, 2, 3, and 5 | `content.db` |
+| 6. Read KANJIDIC2 | `kanjidic2.xml.gz`, and the character set of stage 5 | `character_meaning` and `character_reading` rows |
+| 7. Write `content.db` | Stages 1, 2, 3, 5, and 6 | `content.db` |
 
 ### 6.1 Normalization
 
@@ -494,7 +538,7 @@ The other 4 rows are additions:
 | ⻞ | 食 | Kanji alive gives 飠 as a form of 食, but not ⻞. KanjiVG uses both. |
 | 罒 | 网 | Kanji alive writes the net top as ⺫ (U+2EAB), the code point of the eye radical. |
 | 氺 | 水 | Kanji alive gives 氺 with no position. |
-| 覀 | 襾 | Kanji alive gives the west top as ⻃ with no position. |
+| 覀 | 西 | Kanji alive gives the west top as ⻃ with no position, and with the base 襾. KANJIDIC2 gives 覀 as a variant of 西, and the list follows KANJIDIC2. |
 
 Some bases occur in few words. For example, 艸 occurs in 4 JMdict entries, and 辵 occurs in 1. The
 list keeps these rows, because `mutant` records the base that each mutant comes from.
@@ -520,13 +564,91 @@ An uncovered character has a `character` row and no `character_component` rows. 
 the kanji of a word, and 𠂉 is a component of 毎. KanjiVG has no entry for either character, so both
 are uncovered characters.
 
-### 6.7 Stage 6: Write `content.db`
+### 6.7 Stage 6: Read KANJIDIC2
 
-Stage 6 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
+KANJIDIC2 has 1 `<character>` element for each kanji of 3 Japanese standards (JIS X 0208, 0212, and
+0213). Stage 6 keeps the entries of the characters that stage 5 found, and gives each of those
+characters its details. This element shows the parts of the entry of 語 that stage 6 reads:
+
+```xml
+<character>
+  <literal>語</literal>
+  <reading_meaning>
+    <rmgroup>
+      <reading r_type="pinyin">yu3</reading>
+      <reading r_type="ja_on">ゴ</reading>
+      <reading r_type="ja_kun">かた.る</reading>
+      <reading r_type="ja_kun">かた.らう</reading>
+      <meaning>word</meaning>
+      <meaning>speech</meaning>
+      <meaning>language</meaning>
+      <meaning m_lang="fr">mot</meaning>
+    </rmgroup>
+  </reading_meaning>
+</character>
+```
+
+1. Read `kanjidic2.xml.gz` as a stream of XML events.
+2. For each `<character>`, read the `<literal>` text.
+3. If the literal, as the file writes it, is not a character of the character set of stage 5,
+   ignore the element.
+4. Keep the text of each `<reading>` whose `r_type` is `ja_on` or `ja_kun`, with the type `on` or
+   `kun`.
+5. Keep the text of each `<meaning>` that has no `m_lang` attribute.
+6. Discard all other elements.
+7. If 2 elements give the same character, stop the build.
+
+Stage 6 keeps the readings of an entry in file order, with 1 sequence of positions for the on
+readings and the kun readings together. It keeps the meanings in file order. Each reading gives 1
+`character_reading` row, and each meaning gives 1 `character_meaning` row.
+
+Step 3 means that KANJIDIC2 adds no character. The words and their components decide the character
+set. A character that only KANJIDIC2 knows would have a page that no word and no component links
+to.
+
+Step 3 does not normalize the literal. The character set holds normalized code points only, so the
+entry of a compatibility ideograph, for example U+FA19, matches no character, and step 3 ignores
+it. Normalization replaces U+FA19 with 神, and 神 has its own entry. If step 3 normalized the
+literal, 2 entries would give 神.
+
+**Kun readings.** Stage 6 keeps the text as KANJIDIC2 writes it, with the `.` and the `-`, for
+example かた.る and なま-. The dictionary decides how to show these marks.
+
+**Meanings.** KANJIDIC2 also gives meanings in French, Spanish, and Portuguese. The app is in
+English, as its JMdict file is, so step 5 keeps the English meanings only. Some characters have an
+entry with no English meaning, and some have an entry with no on reading and no kun reading. Such a
+character has no rows in that table.
+
+**Mutants.** KANJIDIC2 has an entry for most of the mutants, because they are in JIS X 0212. Its
+meaning is often the name of the radical, for example "radical number 9" for 亻, and not a meaning
+that helps a learner. Stage 6 keeps these meanings as they are. The dictionary can show the meaning
+of the base in their place, through `mutant`.
+
+**What stage 6 discards.** Later designs can read these elements:
+
+| Element | Content | Reason |
+| --- | --- | --- |
+| `<nanori>` | Readings that occur only in names | Not useful to a learner until the app has names |
+| `<freq>` | Rank of a character in a count of newspaper text | A later design gives each character its frequency |
+| `<stroke_count>` | Number of strokes of a character | No page shows it, and no list uses it for its order |
+| `<grade>` | School list that holds a character: the year of elementary school, the other Jōyō kanji, or the kanji for names | No page shows it. The learning plan of a later design can use it. |
+| `<jlpt>` | Level of the Japanese Language Proficiency Test | The levels are those of the test before 2010, which had 4 levels and not 5 |
+| `<rad_name>` | Name of a radical, for example りっしんべん for 忄 | Needs a place on the mutant page |
+| `<radical>`, `<variant>`, `<dic_number>`, `<query_code>`, `<codepoint>` | Radical number, variants, and references to printed dictionaries | No page shows them |
+| `<reading>` of another `r_type` | Readings in Chinese, Korean, and Vietnamese | Not Japanese |
+
+Stage 6 also reads the file's version: the text of `<date_of_creation>` in the `<header>` element.
+If the file has no such element, the version is NULL, and the build report says so.
+
+A parse error gives the line number in the decompressed file.
+
+### 6.8 Stage 7: Write `content.db`
+
+Stage 7 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
 leaves the previous `content.db` unchanged.
 
 1. Open `content.db.tmp` in the output directory.
-2. Create the 17 tables and the indexes with the statements of `jpdag::schema`.
+2. Create the 19 tables and the indexes with the statements of `jpdag::schema`.
 3. Set `PRAGMA user_version` to `SCHEMA_VERSION`.
 4. Insert all rows in 1 transaction.
 5. Run `PRAGMA foreign_key_check`.
@@ -537,9 +659,10 @@ leaves the previous `content.db` unchanged.
 The foreign keys are off during the insert. Step 5 checks all rows at the end, and the error gives
 the number of rows that fail. A failed build deletes `content.db.tmp`.
 
-Stage 6 writes 1 `source` row for JMdict, KanjiVG, and Kanji alive. The code holds the licence and
-the attribution text of each source. The versions of JMdict and KanjiVG come from stages 1 and 3.
-The version of Kanji alive is NULL, because `data/mutants.tsv` holds its data.
+Stage 7 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, and KANJIDIC2. The code holds the
+licence and the attribution text of each source. The versions of JMdict, KanjiVG, and KANJIDIC2 come
+from stages 1, 3, and 6. The version of Kanji alive is NULL, because `data/mutants.tsv` holds its
+data.
 
 The `rusqlite` crate compiles its own SQLite, so `ingest` and the app use the same SQLite version.
 
@@ -559,6 +682,11 @@ report shows what the sources gave and what the pipeline discarded:
 - each KanjiVG group whose `kvg:element` value does not give exactly 1 code point after normalization
 - each `mutant` row
 - each mutant in `data/mutants.tsv` that is not a KanjiVG component
+- number of characters with a KANJIDIC2 entry, and the number of KANJIDIC2 entries that stage 6
+  ignores
+- each character with no KANJIDIC2 entry, in 3 lists: the kanji of a word, the mutants, and the
+  other components
+- each character with a KANJIDIC2 entry and no English meaning
 - size of `content.db`
 
 ## 8. Tests and CI
@@ -592,7 +720,9 @@ cargo test -p ingest --test build_checks -- --ignored
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
 | `one_row_for_each_jmdict_element` | Numbers of `written_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
-| `sources_have_versions` | `source` holds JMdict, KanjiVG, and Kanji alive, and the rows of JMdict and KanjiVG have a version |
+| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, and KANJIDIC2, and the rows of JMdict, KanjiVG, and KANJIDIC2 have a version |
+| `golden_character_details_exist` | 語 has the meanings word, speech, and language in that order, the on reading ゴ, and the kun readings かた.る and かた.らう |
+| `mutants_keep_their_radical_meanings` | 氵 has the meaning water, and ⻞, which has no KANJIDIC2 entry, has no meaning and no reading |
 
 ### CI
 
@@ -717,11 +847,30 @@ Each row gives the name of the test function of the case.
 | `base_of_a_mutant_joins_the_set` | A character in the set that is the mutant of a stage 4 row | Base is in the set |
 | `mutant_outside_the_set_gives_no_row` | A stage 4 row whose mutant is not in the set | No `mutant` row |
 
+### `kanjidic.rs`
+
+| Test | Input | Expected result |
+| --- | --- | --- |
+| `keeps_the_details_of_an_entry` | Entry of 語 from section 6.7 | 3 readings and 3 meanings |
+| `readings_keep_their_order_and_type` | `ja_on` ゴ, then `ja_kun` かた.る and かた.らう | Positions 1 to 3, with the types `on`, `kun`, and `kun`, and the text with its `.` |
+| `other_reading_types_are_discarded` | Readings of the types `pinyin`, `korean_r`, `korean_h`, and `vietnam` | No readings |
+| `meanings_of_other_languages_are_discarded` | A `<meaning>` with `m_lang="fr"` between 2 English meanings | 2 English meanings, with the positions 1 and 2 |
+| `entry_without_readings_and_meanings` | An entry with a `<literal>` only | No readings and no meanings |
+| `nanori_is_discarded` | An entry with a `<nanori>` | No reading from the `<nanori>` |
+| `character_outside_the_set_is_ignored` | An entry whose literal is not in the character set | No entry, and the build report counts it |
+| `literal_is_not_normalized` | Entry of U+FA19, a compatibility ideograph, with 神 in the set | No entry for U+FA19, and no details for 神 from it |
+| `entry_of_a_supplementary_plane` | Entry of 𠮟 (U+20B9F) | Details of U+20B9F |
+| `meaning_text_is_unescaped` | `<meaning>left &amp; right</meaning>` | Meaning "left & right" |
+| `duplicate_entry_fails` | 2 entries with the same literal | Build fails, and the error gives the line number |
+| `creation_date_gives_the_version` | `<date_of_creation>2026-10-01</date_of_creation>` | Version 2026-10-01 |
+| `no_creation_date_gives_no_version` | A file with no `<header>` | No version, and the build report says so |
+| `reads_gzip_input` | Entry of `keeps_the_details_of_an_entry`, compressed with gzip | Same result |
+
 ### `db.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `empty_build_creates_the_schema` | A build with no rows | 17 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
+| `empty_build_creates_the_schema` | A build with no rows | 19 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
 | `rows_round_trip` | A small set of rows | Same rows in each table |
 | `foreign_key_violation_fails_the_build` | A `written_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
 | `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
@@ -730,7 +879,7 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 17 tables equal the rows in `tests/fixtures/expected.tsv` |
+| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 19 tables equal the rows in `tests/fixtures/expected.tsv` |
 | `two_runs_give_the_same_rows` | 2 runs on the same fixtures | Same rows in each table |
 | `report_counts_match_the_fixtures` | Fixture sources | Counts in the build report that match the fixtures |
 
@@ -743,3 +892,5 @@ The fixtures hold:
 - 1 KanjiVG entry with a direct component that has no KanjiVG entry
 - 1 KanjiVG entry with the direct component ⻞
 - 1 kanji of a word with no KanjiVG entry
+- KANJIDIC2 entries of 語, 吾, and 休, 1 entry of a character that is not in the character set, and
+  1 entry of a compatibility ideograph. The other characters of the fixtures have no entry.
