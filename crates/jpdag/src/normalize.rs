@@ -4,9 +4,10 @@
 use unicode_normalization::UnicodeNormalization;
 
 /// Code points that NFKC does not merge with the unified ideograph that looks identical.
-const MERGE: [(char, char); 5] = [
-    ('\u{2ED6}', '\u{961D}'), // ⻖ → 阝
-    ('\u{2ECF}', '\u{961D}'), // ⻏ → 阝
+///
+/// ⻖ (U+2ED6) and ⻏ (U+2ECF) are not in the table. They look identical to 阝, and to each other,
+/// but they are 2 characters: ⻖ is the left form of 阜, and ⻏ is the right form of 邑.
+const MERGE: [(char, char); 3] = [
     ('\u{2EA8}', '\u{72AD}'), // ⺨ → 犭
     ('\u{2E89}', '\u{5202}'), // ⺉ → 刂
     ('\u{2EA1}', '\u{6C35}'), // ⺡ → 氵
@@ -80,9 +81,10 @@ mod tests {
     }
 
     #[test]
-    fn radical_city_merges_with_its_ideograph() {
-        // ⻏ → 阝
-        assert_eq!(normalize('\u{2ECF}'), "\u{961D}");
+    fn radical_mound_and_radical_city_are_unchanged() {
+        // ⻖ → ⻖, and ⻏ → ⻏
+        assert_eq!(normalize('\u{2ED6}'), "\u{2ED6}");
+        assert_eq!(normalize('\u{2ECF}'), "\u{2ECF}");
     }
 
     #[test]

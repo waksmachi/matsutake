@@ -32,8 +32,8 @@ pub fn read(text: &str) -> Result<Vec<(char, char)>> {
         if mutant == base {
             bail!("mutants.tsv line {n}: the mutant and base are the same character, {base}");
         }
-        if !seen.insert((mutant, base)) {
-            bail!("mutants.tsv line {n}: the row {mutant} → {base} occurs 2 times");
+        if !seen.insert(mutant) {
+            bail!("mutants.tsv line {n}: the mutant {mutant} occurs 2 times");
         }
         rows.push((mutant, base));
     }
@@ -94,10 +94,19 @@ mod tests {
     }
 
     #[test]
-    fn mound_and_city_normalize_to_one_mutant() {
+    fn mutant_with_two_bases_fails() {
+        let error = read("氵\t水\n氵\t氷\n").unwrap_err().to_string();
+        assert!(
+            error.contains("line 2") && error.contains("2 times"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn mound_and_city_are_two_mutants() {
         assert_eq!(
             read("\u{2ED6}\t阜\n\u{2ECF}\t邑\n").unwrap(),
-            vec![('\u{961D}', '阜'), ('\u{961D}', '邑')]
+            vec![('\u{2ED6}', '阜'), ('\u{2ECF}', '邑')]
         );
     }
 

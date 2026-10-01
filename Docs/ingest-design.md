@@ -287,14 +287,16 @@ id.
 
 ### Character identity
 
-Normalization merges code points that look identical. A mutant and its base look different,
-so they stay 2 characters, and `mutant` links them.
+Normalization merges code points that are the same character. A mutant and its base look
+different, so they stay 2 characters, and `mutant` links them. ⻖ and ⻏ look identical, but they
+are 2 characters with 2 bases: ⻖ is the left form of 阜, as in 院, and ⻏ is the right form of 邑,
+as in 部. KanjiVG names the right one in each kanji, so they also stay 2 characters.
 
 | Code points | merged? |
 | --- | --- |
 | 亻 (U+4EBB) and 人 (U+4EBA) | No |
 | ⻞ (U+2EDE) and 飠 (U+98E0) | No |
-| ⻖ (U+2ED6), ⻏ (U+2ECF), and 阝 (U+961D) | Yes |
+| ⻖ (U+2ED6), ⻏ (U+2ECF), and 阝 (U+961D) | No |
 | ⺨ (U+2EA8) and 犭 (U+72AD) | Yes |
 
 ## 6. Pipeline
@@ -341,16 +343,14 @@ the mouth radical as ⼝ (U+2F1D) or as 口 (U+53E3). Without normalization, the
 
 | From | To |
 | --- | --- |
-| ⻖ (U+2ED6) | 阝 (U+961D) |
-| ⻏ (U+2ECF) | 阝 (U+961D) |
 | ⺨ (U+2EA8) | 犭 (U+72AD) |
 | ⺉ (U+2E89) | 刂 (U+5202) |
 | ⺡ (U+2EA1) | 氵 (U+6C35) |
 
 NFKC merges the Kangxi radicals and most compatibility ideographs with their unified ideographs. NFKC
-does not change most code points of the CJK Radicals Supplement block. The table merges the 5 code
-points of that block that look identical to a unified ideograph. Each To value is a unified
-ideograph.
+does not change most code points of the CJK Radicals Supplement block. The table merges the 3 code
+points of that block that are the same character as a unified ideograph. Each To value is a unified
+ideograph. ⻖ and ⻏ are not in the table (section 5, Character identity).
 
 The result can have more than 1 code point. For example, normalization gives 平成 for ㍻ (U+337B).
 
@@ -511,13 +511,14 @@ is not an argument of the binary, and the integration test uses the same list.
 2. Normalize the mutant and base of each line.
 3. If a column does not give exactly 1 character, stop the build.
 4. If the mutant and base are the same character, stop the build.
-5. If 2 lines give the same mutant and base, stop the build.
+5. If 2 lines give the same mutant, stop the build.
 6. If a mutant is not a KanjiVG component, list the mutant in the build report.
 7. Add each line as a stage 4 row.
 
 Steps 3 to 5 stop the build, because an error in the list is an error in this repository, not in a
-source. A mutant can have more than 1 base. After normalization, ⻖ (the left form of 阜) and ⻏ (the
-right form of 邑) are both 阝, so 阝 has 2 rows.
+source. Step 5 means that a mutant has exactly 1 base, so a link to a mutant can go to its base.
+Kanji alive gives 阝 for 2 radicals. The list has ⻖ for the left form of 阜 and ⻏ for the right
+form of 邑, the code points that KanjiVG uses.
 
 The first 19 rows come from `japanese-radicals.csv` of Kanji alive:
 
@@ -528,8 +529,8 @@ The first 19 rows come from `japanese-radicals.csv` of Kanji alive:
 | 飠 | 食 | 刂 | 刀 | 犭 | 犬 |
 | 灬 | 火 | ⺤ | 爪 | 耂 | 老 |
 | 礻 | 示 | 衤 | 衣 | ⻌ | 辵 |
-| 攵 | 攴 | 艹 | 艸 | 阝 | 阜 |
-| 阝 | 邑 | | | | |
+| 攵 | 攴 | 艹 | 艸 | ⻖ | 阜 |
+| ⻏ | 邑 | | | | |
 
 The other 4 rows are additions:
 
@@ -752,7 +753,7 @@ Each row gives the name of the test function of the case.
 | `square_era_name_gives_two_code_points` | ㍻ (U+337B) | 平成 |
 | `radical_simplified_walk_is_unchanged` | ⻌ (U+2ECC) | ⻌ (U+2ECC) |
 | `person_radical_ideograph_is_unchanged` | 亻 (U+4EBB) | 亻 (U+4EBB) |
-| `radical_city_merges_with_its_ideograph` | ⻏ (U+2ECF) | 阝 (U+961D) |
+| `radical_mound_and_radical_city_are_unchanged` | ⻖ (U+2ED6) and ⻏ (U+2ECF) | ⻖ (U+2ED6) and ⻏ (U+2ECF) |
 | `radical_dog_merges_with_its_ideograph` | ⺨ (U+2EA8) | 犭 (U+72AD) |
 | `radical_small_is_unchanged` | ⺌ (U+2E8C) | ⺌ (U+2E8C) |
 
@@ -833,7 +834,8 @@ Each row gives the name of the test function of the case.
 | `column_with_two_characters_fails` | A line whose first column has 2 characters | Build fails, and the error gives the line number |
 | `mutant_equal_to_its_base_fails` | A line whose mutant and base are the same character after normalization | Build fails |
 | `duplicate_row_fails` | 2 lines with the same mutant and base | Build fails |
-| `mound_and_city_normalize_to_one_mutant` | Lines ⻖ → 阜 and ⻏ → 邑 | Rows 阝 → 阜 and 阝 → 邑 |
+| `mutant_with_two_bases_fails` | 2 lines with the same mutant and 2 bases | Build fails, and the error gives the line number |
+| `mound_and_city_are_two_mutants` | Lines ⻖ → 阜 and ⻏ → 邑 | Rows ⻖ → 阜 and ⻏ → 邑 |
 | `mutant_that_is_not_a_kanjivg_component_is_reported` | A mutant that is not a KanjiVG component | 1 stage 4 row, and the build report lists the mutant |
 
 ### `components.rs`
