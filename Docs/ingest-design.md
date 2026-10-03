@@ -69,18 +69,7 @@ The provenance of the data:
 | --- | --- |
 | `source` | 1 row for each source, with its version, its licence, and its attribution text |
 
-Later designs add these items:
-
-- example sentences
-- general frequency (`word.zipf`), and the priority values of `<ke_pri>` and `<re_pri>`
-- other text of a sense: `<lsource>`, `<xref>`, and `<ant>`
-- stroke geometry of each KanjiVG entry, so the app can draw a character and show a tooltip
-  for each component when the user points at its strokes
-- other data of a KANJIDIC2 entry: the name readings (`<nanori>`), the names of a radical
-  (`<rad_name>`), the radical number, the variants, and the dictionary references
-- characters of KANJIDIC2 that no word and no component uses
-- frequency of each character, for lists in order of how common a character is. This design does
-  not read the `<freq>` rank of KANJIDIC2.
+`Docs/future-work.md` lists the work that this design leaves out.
 
 ## 3. Terms
 
@@ -276,7 +265,7 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 
 `content.db` does not record whether a character has a KANJIDIC2 entry: a character with no entry,
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
-no index on `text`: a search for characters by their reading is the work of a later design.
+no index on `text`.
 
 This schema is `SCHEMA_VERSION` 2. Version 1 had no KANJIDIC2 tables.
 
@@ -368,7 +357,6 @@ The result can have more than 1 code point. For example, normalization gives 平
 7. Discard all other elements.
 
 Stage 1 keeps the written forms, readings, senses, and glosses of an entry in file order.
-Later designs read the elements that step 7 discards, for example `<lsource>`.
 
 JMdict writes each tag as an entity reference, for example `&uk;`. The document type definition (DTD)
 gives a text for each entity, for example "word usually written using kana alone". The parser keeps
@@ -625,14 +613,14 @@ meaning is often the name of the radical, for example "radical number 9" for 亻
 that helps a learner. Stage 6 keeps these meanings as they are. The dictionary can show the meaning
 of the base in their place, through `mutant`.
 
-**What stage 6 discards.** Later designs can read these elements:
+**What stage 6 discards:**
 
 | Element | Content | Reason |
 | --- | --- | --- |
 | `<nanori>` | Readings that occur only in names | Not useful to a learner until the app has names |
-| `<freq>` | Rank of a character in a count of newspaper text | A later design gives each character its frequency |
+| `<freq>` | Rank of a character in a count of newspaper text | No list uses it |
 | `<stroke_count>` | Number of strokes of a character | No page shows it, and no list uses it for its order |
-| `<grade>` | School list that holds a character: the year of elementary school, the other Jōyō kanji, or the kanji for names | No page shows it. The learning plan of a later design can use it. |
+| `<grade>` | School list that holds a character: the year of elementary school, the other Jōyō kanji, or the kanji for names | No page shows it |
 | `<jlpt>` | Level of the Japanese Language Proficiency Test | The levels are those of the test before 2010, which had 4 levels and not 5 |
 | `<rad_name>` | Name of a radical, for example りっしんべん for 忄 | Needs a place on the mutant page |
 | `<radical>`, `<variant>`, `<dic_number>`, `<query_code>`, `<codepoint>` | Radical number, variants, and references to printed dictionaries | No page shows them |

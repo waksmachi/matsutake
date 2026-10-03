@@ -17,4 +17,6 @@ matsutake/
     ingest/                   the binary that writes content.db
   app/                        the Flutter project
   Docs/
+    ingest-design.md          how ingest builds content.db
+    future-work.md            the work that the designs leave out
 ```
