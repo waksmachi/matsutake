@@ -50,6 +50,8 @@ design says what it does, and an item moves from this list into a design when it
 - a way to replace an old copy of `content.db` when the app ships a new one. Now a developer
   deletes the copy by hand.
 - an attribution page that shows the `source` table
+- the licence of the Mozc romaji table (`crates/jpdag/data/mozc/LICENSE`) in the licences that
+  the app shows. BSD 3-Clause asks for the notice in each copy of the app.
 - a touch layout. The app design assumes a window, a pointer, and a keyboard.
 - accessibility: screen-reader labels of the chips, text scaling, and contrast
 - widget tests: the search dropdown (the paging, the selection, and the Enter key of an input
