@@ -6,4 +6,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+rusqlite.workspace = true
+serde.workspace = true
+serde_rusqlite.workspace = true
+thiserror.workspace = true
 unicode-normalization.workspace = true

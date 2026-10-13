@@ -13,4 +13,7 @@ anyhow = "1.0.104"
 flate2 = "1.1.10"
 quick-xml = "0.42.0"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_rusqlite = "0.43.0"
+thiserror = "2.0.21"
 unicode-normalization = "0.1.25"
