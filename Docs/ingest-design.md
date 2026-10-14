@@ -1,4 +1,4 @@
-# Ingest: JMdict, components, and kanji details
+# Ingest: JMdict, components, kanji details, and reading counts
 
 This document describes the design of the `ingest` crate. `ingest` populates `content.db`, the
 database of the app, from free public data sources.
@@ -19,7 +19,9 @@ The `ingest` crate builds the graph in stages.
 3. `data/mutants.tsv`, a list in this repository, gives the mutant mapping.
 4. *KANJIDIC2* gives the details of each character of the graph: its meanings and its readings.
    KANJIDIC2 adds no character to the graph.
-5. Graph is written from memory into `content.db`.
+5. *JmdictFurigana* gives the part of the reading of each word that belongs to each kanji. From
+   it, ingest counts the words that read each character with each of its KANJIDIC2 readings.
+6. Graph is written from memory into `content.db`.
 
 ## 2. Scope
 
@@ -40,7 +42,7 @@ The details of each character, from KANJIDIC2:
 | Table | Content |
 | --- | --- |
 | `character_meaning` | English meanings of each character (`<meaning>`) |
-| `character_reading` | On readings and kun readings of each character (`<reading>`) |
+| `character_reading` | On readings and kun readings of each character (`<reading>`), with the number of words that use each reading (from JmdictFurigana) |
 
 The structure of each JMdict entry:
 
@@ -102,15 +104,19 @@ The provenance of the data:
 | JMdict | `JMdict_e.gz` | EDRDG | CC BY-SA 4.0 | Entries, written forms, readings, senses, and tags |
 | KanjiVG | `kanjivg-YYYYMMDD.xml.gz`, from the GitHub release | KanjiVG project | CC BY-SA 3.0 | Components of each character |
 | KANJIDIC2 | `kanjidic2.xml.gz` | EDRDG | CC BY-SA 4.0 | Meanings and readings of each character |
+| JmdictFurigana | `JmdictFurigana-YYYY-MM-DD.txt`, from the GitHub release | Doublevil | CC BY-SA, the licence of JMdict | The kanji of each written form that each part of its reading belongs to |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
 KanjiVG release, for example r20250816. JMdict and KANJIDIC2 have no releases, so the script
-downloads the current files. EDRDG publishes a new file of each on most days.
+downloads the current files. EDRDG publishes a new file of each on most days. JmdictFurigana has a
+release each month. The script downloads the latest release, and names the file with the date of
+its tag, for example `JmdictFurigana-2026-09-25.txt`, because the file holds no version.
 
 `data/mutants.tsv` is not a download. The first 19 rows of the file come from `japanese-radicals.csv`
 of Kanji alive (CC BY 4.0), and the file's header credits Kanji alive (section 6.5).
 
-`content.db` is a derivative of JMdict, KanjiVG, and KANJIDIC2, so CC BY-SA applies to it. The `source` table
+`content.db` is a derivative of JMdict, KanjiVG, KANJIDIC2, and JmdictFurigana, so CC BY-SA applies
+to it. The `source` table
 holds the attribution that each licence asks for, so the app can show it.
 
 The `ingest` binary reads local files only and has no network code. The arguments of the binary give
@@ -142,6 +148,7 @@ CREATE TABLE character_reading (
   position     INTEGER NOT NULL,
   type         TEXT NOT NULL CHECK (type IN ('on', 'kun')),
   text         TEXT NOT NULL,
+  word_count   INTEGER NOT NULL,                            -- words that use the reading
   PRIMARY KEY (character_id, position)
 ) STRICT, WITHOUT ROWID;
 
@@ -241,7 +248,8 @@ CREATE TABLE sense_tag (
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE source (
-  name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, or KANJIDIC2
+  name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, KANJIDIC2,
+                                                            -- or JmdictFurigana
   version     TEXT,                                         -- the file's date
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
@@ -267,7 +275,8 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
 no index on `text`.
 
-This schema is `SCHEMA_VERSION` 2. Version 1 had no KANJIDIC2 tables.
+This schema is `SCHEMA_VERSION` 3. Version 2 had no `character_reading.word_count`, and version 1
+had no KANJIDIC2 tables.
 
 Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
 the position, so 2 builds from the same files give the same ids. The ids change when JMdict changes.
@@ -306,7 +315,10 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
        │                6 Read KANJIDIC2 ◄────── kanjidic2.xml.gz
        │                        │
        │                        ▼
-       └──────────────► 7 Write content.db
+       ├──────────────► 7 Count the readings ◄── JmdictFurigana-*.txt
+       │                        │
+       │                        ▼
+       └──────────────► 8 Write content.db
 ```
 
 | Stage | Input | Output |
@@ -317,7 +329,8 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
 | 4. Read the mutants | `data/mutants.tsv`, and the KanjiVG components of stage 3 | Candidate `mutant` rows |
 | 5. Complete the character set | Stages 2, 3, and 4 | `character`, `character_component`, and `mutant` rows |
 | 6. Read KANJIDIC2 | `kanjidic2.xml.gz`, and the character set of stage 5 | `character_meaning` and `character_reading` rows |
-| 7. Write `content.db` | Stages 1, 2, 3, 5, and 6 | `content.db` |
+| 7. Count the readings | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `character_reading.word_count` of each reading |
+| 8. Write `content.db` | Stages 1, 2, 3, 5, 6, and 7 | `content.db` |
 
 ### 6.1 Normalization
 
@@ -631,9 +644,52 @@ If the file has no such element, the version is NULL, and the build report says 
 
 A parse error gives the line number in the decompressed file.
 
-### 6.8 Stage 7: Write `content.db`
+### 6.8 Stage 7: Count the readings
 
-Stage 7 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
+A kanji page lists the readings of the kanji in order of use. KANJIDIC2 gives the readings, but not
+how many words use each. JmdictFurigana gives, for each written form and reading of a JMdict entry,
+the part of the reading that belongs to each kanji:
+
+```
+語学|ごがく|0:ご;1:がく
+語る|かたる|0:かた
+今日|きょう|0-1:きょう
+```
+
+Each line holds the written form, the reading, and the parts: the index of a character in the
+written form (or a range of characters), then its kana. For each KANJIDIC2 reading of each
+character, stage 7 counts the words that read the character with that reading.
+
+1. Read `JmdictFurigana-*.txt` line by line. A line that does not have 3 fields stops the build,
+   with its line number.
+2. Find the words with that written form and that reading. If there is none, count the line in
+   the build report, and skip it.
+3. For each part of 1 character: normalize the character, and take its KANJIDIC2 readings. Skip a
+   part for a range of characters, such as 今日, because it reads no single kanji.
+4. Compare the kana of the part with each reading (below). If no reading matches, count the part
+   in the build report.
+5. If more than 1 kun reading matches, take the reading whose okurigana share the most kana with
+   the text after the character in the written form. A tie goes to the first reading.
+6. Add the words of the line to the words of the reading.
+
+`word_count` is the number of different words of a reading. A word that reads the character with
+the same reading in 2 written forms counts once.
+
+**The comparison.** An on reading becomes hiragana. A kun reading loses its okurigana, the text
+after the `.`, because the furigana do not cover okurigana: かた.る becomes かた. The `-` of a
+prefix or a suffix goes. The kana of the part match the reading if they equal it, or equal it with
+the sound changes of a compound:
+
+- a voiced first kana (rendaku): ぼん for ほん in 三本, and ぱ or ば for は
+- a small っ for a last つ, ち, く, or き (sokuon): がっ for がく in 学校
+
+Other sound changes, and the readings that KANJIDIC2 does not list, match no reading. The file name
+gives the version of JmdictFurigana. If the name has no date, the version is NULL, and the build
+report says so.
+
+### 6.9 Stage 8: Write `content.db`
+
+Stage 8 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
 leaves the previous `content.db` unchanged.
 
 1. Open `content.db.tmp` in the output directory.
@@ -648,10 +704,10 @@ leaves the previous `content.db` unchanged.
 The foreign keys are off during the insert. Step 5 checks all rows at the end, and the error gives
 the number of rows that fail. A failed build deletes `content.db.tmp`.
 
-Stage 7 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, and KANJIDIC2. The code holds the
-licence and the attribution text of each source. The versions of JMdict, KanjiVG, and KANJIDIC2 come
-from stages 1, 3, and 6. The version of Kanji alive is NULL, because `data/mutants.tsv` holds its
-data.
+Stage 8 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, and JmdictFurigana. The
+code holds the licence and the attribution text of each source. The versions of JMdict, KanjiVG,
+KANJIDIC2, and JmdictFurigana come from stages 1, 3, 6, and 7. The version of Kanji alive is NULL,
+because `data/mutants.tsv` holds its data.
 
 The `rusqlite` crate compiles its own SQLite, so `ingest` and the app use the same SQLite version.
 
@@ -676,6 +732,10 @@ report shows what the sources gave and what the pipeline discarded:
 - each character with no KANJIDIC2 entry, in 3 lists: the kanji of a word, the mutants, and the
   other components
 - each character with a KANJIDIC2 entry and no English meaning
+- number of JmdictFurigana lines, and the number of lines that are not a written form and a
+  reading of 1 word
+- number of parts of 1 kanji whose kana are none of its KANJIDIC2 readings
+- number of KANJIDIC2 readings that 1 or more words use
 - size of `content.db`
 
 ## 8. Tests and CI
@@ -709,9 +769,10 @@ cargo test -p ingest --test build_checks -- --ignored
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
 | `one_row_for_each_jmdict_element` | Numbers of `written_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
-| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, and KANJIDIC2, and the rows of JMdict, KanjiVG, and KANJIDIC2 have a version |
+| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, and JmdictFurigana, and the rows of JMdict, KanjiVG, KANJIDIC2, and JmdictFurigana have a version |
 | `golden_character_details_exist` | 語 has the meanings word, speech, and language in that order, the on reading ゴ, and the kun readings かた.る and かた.らう |
 | `mutants_keep_their_radical_meanings` | 氵 has the meaning water, and ⻞, which has no KANJIDIC2 entry, has no meaning and no reading |
+| `readings_have_word_counts` | More words use ゴ of 語 than かた.る, かた.る has a count, and ガク of 学 has a count of 100 or more |
 
 ### CI
 
@@ -856,6 +917,18 @@ Each row gives the name of the test function of the case.
 | `no_creation_date_gives_no_version` | A file with no `<header>` | No version, and the build report says so |
 | `reads_gzip_input` | Entry of `keeps_the_details_of_an_entry`, compressed with gzip | Same result |
 
+### `furigana.rs`
+
+| Test | Input | Expected result |
+| --- | --- | --- |
+| `counts_the_words_of_each_reading` | Furigana of 語学, 語る, and 英語, and the readings ゴ and かた.る of 語 | ゴ has 2 words, and かた.る has 1 |
+| `line_of_no_word_is_counted_and_skipped` | A line whose written form and reading are not a word | The report counts the line, and no reading has a word |
+| `voiced_first_kana_and_small_tsu_match` | がっ of 学 in 学校, and ぼん of 本 in 三本 | ガク of 学 and ホン of 本 each have 1 word |
+| `okurigana_decide_between_kun_readings` | 生かす and 生きる, with the kun readings い.きる and い.かす of 生 | Each reading has 1 word |
+| `irregular_reading_is_reported` | 今日 as きょう (a range), 今日 as こんにち, and ひ of 日 in 日向 when 日 has only ニチ | コン and ニチ each have 1 word. The range is skipped, and the report counts 1 part with no reading. |
+| `a_word_counts_once_for_each_reading` | 2 lines that give the same word the same reading | The reading has 1 word |
+| `version_comes_from_the_file_name` | `JmdictFurigana-2026-09-25.txt`, and `JmdictFurigana.txt` | Version 2026-09-25, and no version |
+
 ### `db.rs`
 
 | Test | Input | Expected result |
@@ -884,3 +957,5 @@ The fixtures hold:
 - 1 kanji of a word with no KanjiVG entry
 - KANJIDIC2 entries of 語, 吾, and 休, 1 entry of a character that is not in the character set, and
   1 entry of a compatibility ideograph. The other characters of the fixtures have no entry.
+- JmdictFurigana lines for the JMdict entries 語る, 語り, 休み, and 吾人, and 1 line, 語学, that is
+  not a word of the fixtures

@@ -16,7 +16,15 @@ sources=(
   "$kanjivg_file https://github.com/KanjiVG/kanjivg/releases/download/$kanjivg_release/$kanjivg_file"
 )
 
-rm -f sources/kanjivg-*.xml.gz
+# JmdictFurigana has a release each month. The tag of the release, for example 2.3.1+2026-09-25,
+# gives the date in the file name, and ingest reads the version from the file name.
+furigana_url="https://github.com/Doublevil/JmdictFurigana/releases/latest"
+furigana_tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "$furigana_url")"
+furigana_date="${furigana_tag##*%2B}"
+furigana_date="${furigana_date##*+}"
+sources+=("JmdictFurigana-$furigana_date.txt $furigana_url/download/JmdictFurigana.txt")
+
+rm -f sources/kanjivg-*.xml.gz sources/JmdictFurigana-*.txt
 for source in "${sources[@]}"; do
   read -r file url <<<"$source"
   echo "Downloading $file" >&2

@@ -219,10 +219,16 @@ fn sources_have_versions() {
         .unwrap()
         .collect::<rusqlite::Result<_>>()
         .unwrap();
-    for name in ["JMdict", "KanjiVG", "Kanji alive", "KANJIDIC2"] {
+    for name in [
+        "JMdict",
+        "KanjiVG",
+        "Kanji alive",
+        "KANJIDIC2",
+        "JmdictFurigana",
+    ] {
         assert!(sources.contains_key(name), "no source row for {name}");
     }
-    for name in ["JMdict", "KanjiVG", "KANJIDIC2"] {
+    for name in ["JMdict", "KanjiVG", "KANJIDIC2", "JmdictFurigana"] {
         assert!(
             sources[name].is_some(),
             "the source row of {name} has no version"
@@ -275,4 +281,23 @@ fn mutants_keep_their_radical_meanings() {
     // ⻞ has no KANJIDIC2 entry.
     assert!(meanings(&conn, '⻞').is_empty());
     assert!(readings(&conn, '⻞').is_empty());
+}
+
+#[test]
+#[ignore]
+fn readings_have_word_counts() {
+    let conn = content_db();
+    let word_count = |character: char, text: &str| -> i64 {
+        conn.query_row(
+            "SELECT word_count FROM character_reading WHERE character_id = ?1 AND text = ?2",
+            rusqlite::params![character as u32, text],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    // 語 is ゴ in most of its words, and かた.る in a few.
+    assert!(word_count('語', "ゴ") > word_count('語', "かた.る"));
+    assert!(word_count('語', "かた.る") > 0);
+    // 学 is がっ in 学校, and 1 count covers both forms of the reading.
+    assert!(word_count('学', "ガク") >= 100);
 }

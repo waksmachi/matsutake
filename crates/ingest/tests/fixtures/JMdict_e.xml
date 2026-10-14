@@ -79,4 +79,9 @@
 <r_ele><reb>て</reb><re_restr>掌</re_restr></r_ele>
 <sense><stagk>腕</stagk><pos>&n;</pos><misc>&newtag;</misc><gloss>hand</gloss></sense>
 </entry>
+<!-- Words for the furigana of stage 7. -->
+<entry><ent_seq>1000600</ent_seq><k_ele><keb>語る</keb></k_ele><r_ele><reb>かたる</reb></r_ele><sense><gloss>to talk</gloss></sense></entry>
+<entry><ent_seq>1000610</ent_seq><k_ele><keb>語り</keb></k_ele><r_ele><reb>かたり</reb></r_ele><sense><gloss>narration</gloss></sense></entry>
+<entry><ent_seq>1000620</ent_seq><k_ele><keb>休み</keb></k_ele><r_ele><reb>やすみ</reb></r_ele><sense><gloss>rest</gloss></sense></entry>
+<entry><ent_seq>1000630</ent_seq><k_ele><keb>吾人</keb></k_ele><r_ele><reb>ごじん</reb></r_ele><sense><gloss>we</gloss></sense></entry>
 </JMdict>

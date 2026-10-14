@@ -62,17 +62,17 @@ character_meaning	吾	4	one's own
 character_meaning	語	1	word
 character_meaning	語	2	speech
 character_meaning	語	3	language
-character_reading	休	1	on	キュウ
-character_reading	休	2	kun	やす.む
-character_reading	休	3	kun	やす.まる
-character_reading	休	4	kun	やす.める
-character_reading	吾	1	on	ゴ
-character_reading	吾	2	kun	われ
-character_reading	吾	3	kun	わが-
-character_reading	吾	4	kun	あ-
-character_reading	語	1	on	ゴ
-character_reading	語	2	kun	かた.る
-character_reading	語	3	kun	かた.らう
+character_reading	休	1	on	キュウ	0
+character_reading	休	2	kun	やす.む	1
+character_reading	休	3	kun	やす.まる	0
+character_reading	休	4	kun	やす.める	0
+character_reading	吾	1	on	ゴ	1
+character_reading	吾	2	kun	われ	0
+character_reading	吾	3	kun	わが-	0
+character_reading	吾	4	kun	あ-	0
+character_reading	語	1	on	ゴ	0
+character_reading	語	2	kun	かた.る	2
+character_reading	語	3	kun	かた.らう	0
 character_component	休	亻
 character_component	休	木
 character_component	吾	五
@@ -124,6 +124,10 @@ gloss	6	1	T-shirt	NULL
 gloss	7	1	deadline	NULL
 gloss	8	1	to scold	NULL
 gloss	9	1	god	NULL
+gloss	29	1	to talk	NULL
+gloss	30	1	narration	NULL
+gloss	31	1	rest	NULL
+gloss	32	1	we	NULL
 written_form	1	1000010	1	正
 written_form	10	1000100	1	神
 written_form	11	1000110	1	﨑
@@ -150,6 +154,10 @@ written_form	6	1000060	1	取り扱い
 written_form	7	1000070	1	Tシャツ
 written_form	8	1000080	1	〆切
 written_form	9	1000090	1	𠮟る
+written_form	27	1000600	1	語る
+written_form	28	1000610	1	語り
+written_form	29	1000620	1	休み
+written_form	30	1000630	1	吾人
 written_form_kanji	1	正
 written_form_kanji	10	神
 written_form_kanji	11	﨑
@@ -182,6 +190,11 @@ written_form_kanji	6	取
 written_form_kanji	6	扱
 written_form_kanji	8	切
 written_form_kanji	9	𠮟
+written_form_kanji	27	語
+written_form_kanji	28	語
+written_form_kanji	29	休
+written_form_kanji	30	人
+written_form_kanji	30	吾
 written_form_tag	2	1
 written_form_tag	22	1
 written_form_tag	23	4
@@ -202,6 +215,10 @@ reading	5	1000500	3	チョット	1
 reading	6	1000510	1	あした	0
 reading	7	1000510	2	あす	0
 reading	8	1000520	1	て	0
+reading	10	1000610	1	かたり	0
+reading	11	1000620	1	やすみ	0
+reading	12	1000630	1	ごじん	0
+reading	9	1000600	1	かたる	0
 reading_restriction	4	23
 reading_tag	4	6
 sense	1	1000010	1	NULL
@@ -232,6 +249,10 @@ sense	6	1000070	1	NULL
 sense	7	1000080	1	NULL
 sense	8	1000090	1	NULL
 sense	9	1000100	1	NULL
+sense	29	1000600	1	NULL
+sense	30	1000610	1	NULL
+sense	31	1000620	1	NULL
+sense	32	1000630	1	NULL
 sense_written_form	22	22
 sense_reading	22	3
 sense_tag	1	2
@@ -251,6 +272,7 @@ source	JMdict	2026-09-28	CC BY-SA 4.0	…
 source	KANJIDIC2	2026-10-01	CC BY-SA 4.0	…
 source	Kanji alive	NULL	CC BY 4.0	…
 source	KanjiVG	2025-08-16	CC BY-SA 3.0	…
+source	JmdictFurigana	2026-09-25	CC BY-SA 4.0	…
 tag	1	ke_inf	rK	rarely used kanji form
 tag	10	field	med	medicine
 tag	11	dial	ksb	Kansai-ben
@@ -287,3 +309,7 @@ word	1000410
 word	1000500
 word	1000510
 word	1000520
+word	1000600
+word	1000610
+word	1000620
+word	1000630

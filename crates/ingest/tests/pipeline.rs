@@ -59,6 +59,8 @@ fn run_ingest(out: &Path) -> String {
         .arg(fixture("kanjivg.xml"))
         .arg("--kanjidic")
         .arg(fixture("kanjidic2.xml"))
+        .arg("--furigana")
+        .arg(fixture("JmdictFurigana-2026-09-25.txt"))
         .arg("--out")
         .arg(out)
         .output()
@@ -180,6 +182,11 @@ fn report_counts_match_the_fixtures() {
         "Mutants with no KANJIDIC2 entry: 7",
         "  亻 U+4EBB",
         "Characters with a KANJIDIC2 entry and no English meaning: 0",
+        "  JmdictFurigana       2026-09-25",
+        "JmdictFurigana lines: 5",
+        "JmdictFurigana lines that are not a written form and a reading of 1 word: 1",
+        "Furigana of 1 kanji that are none of its KANJIDIC2 readings: 0",
+        "KANJIDIC2 readings that 1 or more words use: 3",
     ] {
         assert!(
             report.lines().any(|l| l == line),

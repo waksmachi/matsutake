@@ -1,4 +1,4 @@
-//! Stage 7: write `content.db`.
+//! Stage 8: write `content.db`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,8 +28,8 @@ pub struct Rows {
     pub characters: Vec<u32>,
     /// Each row as (character_id, position, text).
     pub character_meanings: Vec<(u32, u32, String)>,
-    /// Each row as (character_id, position, type, text).
-    pub character_readings: Vec<(u32, u32, &'static str, String)>,
+    /// Each row as (character_id, position, type, text, word_count).
+    pub character_readings: Vec<(u32, u32, &'static str, String, u32)>,
     /// Each row as (character_id, component_id).
     pub character_components: Vec<(u32, u32)>,
     /// Each row as (mutant_id, base_id).
@@ -110,9 +110,9 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     for (character_id, position, text) in &rows.character_meanings {
         insert.execute(params![character_id, position, text])?;
     }
-    let mut insert = tx.prepare("INSERT INTO character_reading VALUES (?1, ?2, ?3, ?4)")?;
-    for (character_id, position, kind, text) in &rows.character_readings {
-        insert.execute(params![character_id, position, kind, text])?;
+    let mut insert = tx.prepare("INSERT INTO character_reading VALUES (?1, ?2, ?3, ?4, ?5)")?;
+    for (character_id, position, kind, text, word_count) in &rows.character_readings {
+        insert.execute(params![character_id, position, kind, text, word_count])?;
     }
     let mut insert = tx.prepare("INSERT INTO written_form VALUES (?1, ?2, ?3, ?4)")?;
     for k in &e.written_forms {
@@ -276,8 +276,8 @@ mod tests {
             characters: vec![0x4EBA, 0x4EBB, 0x4F11, 0x6728],
             character_meanings: vec![(0x4F11, 1, "rest".into()), (0x4F11, 2, "day off".into())],
             character_readings: vec![
-                (0x4F11, 1, "on", "キュウ".into()),
-                (0x4F11, 2, "kun", "やす.む".into()),
+                (0x4F11, 1, "on", "キュウ".into(), 3),
+                (0x4F11, 2, "kun", "やす.む".into(), 1),
             ],
             character_components: vec![(0x4F11, 0x4EBB), (0x4F11, 0x6728)],
             mutants: vec![(0x4EBB, 0x4EBA)],
@@ -301,7 +301,7 @@ mod tests {
         assert_eq!(columns(&conn, "mutant"), ["mutant_id", "base_id"]);
         assert_eq!(
             columns(&conn, "character_reading"),
-            ["character_id", "position", "type", "text"]
+            ["character_id", "position", "type", "text", "word_count"]
         );
         assert_eq!(
             columns(&conn, "reading"),

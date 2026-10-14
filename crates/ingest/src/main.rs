@@ -1,8 +1,10 @@
-//! Builds the tables of `content.db` from JMdict, KanjiVG, `data/mutants.tsv`, and KANJIDIC2.
+//! Builds the tables of `content.db` from JMdict, KanjiVG, `data/mutants.tsv`, KANJIDIC2, and
+//! JmdictFurigana.
 //! `Docs/ingest-design.md` describes the pipeline.
 
 mod components;
 mod db;
+mod furigana;
 mod jmdict;
 mod kanji_links;
 mod kanjidic;
@@ -20,7 +22,7 @@ use std::process::ExitCode;
 use anyhow::{Context, Result, bail};
 
 const USAGE: &str = "usage: ingest --jmdict JMdict_e.gz --kanjivg kanjivg-YYYYMMDD.xml.gz \
---kanjidic kanjidic2.xml.gz --out DIR";
+--kanjidic kanjidic2.xml.gz --furigana JmdictFurigana-YYYY-MM-DD.txt --out DIR";
 
 const JMDICT_ATTRIBUTION: &str = "This app uses the JMdict dictionary file. The file is the \
 property of the Electronic Dictionary Research and Development Group, and is used in conformance \
@@ -37,21 +39,28 @@ const KANJIDIC_ATTRIBUTION: &str = "This app uses the KANJIDIC2 dictionary file.
 property of the Electronic Dictionary Research and Development Group, and is used in conformance \
 with the licence of the Group. https://www.edrdg.org/edrdg/licence.html";
 
+const FURIGANA_ATTRIBUTION: &str = "This app uses JmdictFurigana by Doublevil, under the \
+Creative Commons Attribution-ShareAlike licence of JMdict. \
+https://github.com/Doublevil/JmdictFurigana";
+
 struct Args {
     jmdict: PathBuf,
     kanjivg: PathBuf,
     kanjidic: PathBuf,
+    furigana: PathBuf,
     out: PathBuf,
 }
 
 fn parse_args() -> Result<Args> {
     let mut args = std::env::args_os().skip(1);
-    let (mut jmdict, mut kanjivg, mut kanjidic, mut out) = (None, None, None, None);
+    let (mut jmdict, mut kanjivg, mut kanjidic, mut furigana, mut out) =
+        (None, None, None, None, None);
     while let Some(flag) = args.next() {
         let slot = match flag.to_str() {
             Some("--jmdict") => &mut jmdict,
             Some("--kanjivg") => &mut kanjivg,
             Some("--kanjidic") => &mut kanjidic,
+            Some("--furigana") => &mut furigana,
             Some("--out") => &mut out,
             _ => bail!("unknown argument {flag:?}\n{USAGE}"),
         };
@@ -67,6 +76,7 @@ fn parse_args() -> Result<Args> {
         jmdict: need(jmdict, "--jmdict")?,
         kanjivg: need(kanjivg, "--kanjivg")?,
         kanjidic: need(kanjidic, "--kanjidic")?,
+        furigana: need(furigana, "--furigana")?,
         out: need(out, "--out")?,
     })
 }
@@ -79,6 +89,7 @@ struct Findings {
     /// Kanji of the written forms.
     form_kanji: BTreeSet<char>,
     kanjidic: kanjidic::Kanjidic,
+    furigana: furigana::Furigana,
 }
 
 fn run(args: &Args) -> Result<String> {
@@ -104,13 +115,29 @@ fn run(args: &Args) -> Result<String> {
     let kanjidic = kanjidic::parse(source::open_path(&args.kanjidic)?, &set.characters)?;
 
     // Stage 7.
+    let furigana = furigana::count(
+        source::open_path(&args.furigana)?,
+        furigana::version_from_path(&args.furigana),
+        &entries,
+        &kanjidic,
+    )?;
+
+    // Stage 8.
+    let character_readings = kanjidic
+        .reading_rows()
+        .into_iter()
+        .map(|(id, position, kind, text)| {
+            let count = char::from_u32(id).map_or(0, |c| furigana.word_count(c, position));
+            (id, position, kind, text, count)
+        })
+        .collect();
     let pair = |&(a, b): &(char, char)| (a as u32, b as u32);
     let rows = db::Rows {
         entries,
         written_form_kanji: kanji_links.iter().map(|&(id, k)| (id, k as u32)).collect(),
         characters: set.characters.iter().map(|&c| c as u32).collect(),
         character_meanings: kanjidic.meaning_rows(),
-        character_readings: kanjidic.reading_rows(),
+        character_readings,
         character_components: set.character_components.iter().map(pair).collect(),
         mutants: set.mutants.iter().map(pair).collect(),
         sources: vec![
@@ -138,6 +165,12 @@ fn run(args: &Args) -> Result<String> {
                 licence: "CC BY-SA 4.0",
                 attribution: KANJIDIC_ATTRIBUTION,
             },
+            db::Source {
+                name: "JmdictFurigana",
+                version: furigana.version.clone(),
+                licence: "CC BY-SA 4.0",
+                attribution: FURIGANA_ATTRIBUTION,
+            },
         ],
     };
     fs::create_dir_all(&args.out)
@@ -150,6 +183,7 @@ fn run(args: &Args) -> Result<String> {
         not_kanjivg_components,
         form_kanji: kanji_links.iter().map(|&(_, k)| k).collect(),
         kanjidic,
+        furigana,
     };
     Ok(report(&rows, &findings, size))
 }
@@ -169,6 +203,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
             (Some(version), _) => version.clone(),
             (None, "Kanji alive") => "none (data/mutants.tsv holds its data)".into(),
             (None, "KANJIDIC2") => "none: the file has no <date_of_creation> element".into(),
+            (None, "JmdictFurigana") => "none: the file name has no date".into(),
             (None, _) => "none: the file has no version comment".into(),
         };
         let _ = writeln!(r, "  {:<20} {version}", source.name);
@@ -243,6 +278,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
     }
 
     report_kanjidic(&mut r, findings);
+    report_furigana(&mut r, &findings.furigana);
 
     let _ = writeln!(
         r,
@@ -314,6 +350,26 @@ fn report_kanjidic(r: &mut String, findings: &Findings) {
     for c in no_meaning {
         let _ = writeln!(r, "  {}", describe(c));
     }
+}
+
+/// Adds the findings of stage 7 to the report `r`.
+fn report_furigana(r: &mut String, furigana: &furigana::Furigana) {
+    let _ = writeln!(r, "\nJmdictFurigana lines: {}", furigana.lines);
+    let _ = writeln!(
+        r,
+        "JmdictFurigana lines that are not a written form and a reading of 1 word: {}",
+        furigana.lines_without_word
+    );
+    let _ = writeln!(
+        r,
+        "Furigana of 1 kanji that are none of its KANJIDIC2 readings: {}",
+        furigana.parts_without_reading
+    );
+    let _ = writeln!(
+        r,
+        "KANJIDIC2 readings that 1 or more words use: {}",
+        furigana.readings_in_use()
+    );
 }
 
 fn main() -> ExitCode {
