@@ -1,7 +1,7 @@
-//! Stage 7: count the words that read each character with each of its readings, from the
-//! furigana of JmdictFurigana.
+//! Stage 7: read the furigana of JmdictFurigana. Keep the furigana of each written form and
+//! reading, and count the words that read each character with each of its readings.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::BufRead;
 use std::path::Path;
 
@@ -31,6 +31,8 @@ pub struct Furigana {
     pub parts_without_reading: usize,
     /// The words that read each character with the reading at each position.
     words: BTreeMap<(char, u32), BTreeSet<u32>>,
+    /// `furigana` rows, each as (written_form_id, reading_id, position, start, length, kana).
+    pub rows: Vec<(u32, u32, u32, u32, u32, String)>,
 }
 
 impl Furigana {
@@ -46,6 +48,9 @@ impl Furigana {
         self.words.len()
     }
 }
+
+/// A written form and a reading of a word, as (word_id, written_form_id, reading_id).
+type Pair = (u32, u32, u32);
 
 /// Gives the date of the release from a file name such as `JmdictFurigana-2026-09-25.txt`.
 pub fn version_from_path(path: &Path) -> Option<String> {
@@ -145,34 +150,38 @@ fn common_prefix(a: &str, b: &str) -> usize {
     a.chars().zip(b.chars()).take_while(|(x, y)| x == y).count()
 }
 
-/// Reads the furigana of the words, and counts the words that use each reading of each
-/// character of `kanjidic`.
+/// Reads the furigana of the words. Keeps the furigana of each written form and reading of a
+/// word, and counts the words that use each reading of each character of `kanjidic`.
 ///
 /// Each line of the file is `<written form>|<reading>|<furigana>`. The furigana are parts such
 /// as `0:ご;1:がく`: the index of the character in the written form, then its kana. A part for a
-/// range of characters, such as `0-1:きょう` for 今日, reads no single kanji, and stage 7 skips it.
+/// range of characters, such as `0-1:きょう` for 今日, reads no single kanji: it is a furigana row,
+/// and the counts skip it.
 pub fn count(
     mut input: Source,
     version: Option<String>,
     entries: &EntryRows,
     kanjidic: &Kanjidic,
 ) -> Result<Furigana> {
-    let mut words_of: HashMap<(&str, &str), Vec<u32>> = HashMap::new();
-    let mut readings_of: HashMap<u32, Vec<&str>> = HashMap::new();
+    // Each written form and reading of a word, by the texts of the form and the reading.
+    let mut pairs_of: HashMap<(&str, &str), Vec<Pair>> = HashMap::new();
+    let mut readings_of: HashMap<u32, Vec<(u32, &str)>> = HashMap::new();
     for reading in &entries.readings {
         readings_of
             .entry(reading.word_id)
             .or_default()
-            .push(&reading.text);
+            .push((reading.id, &reading.text));
     }
     for form in &entries.written_forms {
-        for &reading in readings_of.get(&form.word_id).into_iter().flatten() {
-            words_of
-                .entry((&form.text, reading))
-                .or_default()
-                .push(form.word_id);
+        for &(reading_id, reading) in readings_of.get(&form.word_id).into_iter().flatten() {
+            pairs_of.entry((&form.text, reading)).or_default().push((
+                form.word_id,
+                form.id,
+                reading_id,
+            ));
         }
     }
+    let mut pairs_with_rows = HashSet::new();
     let candidates: HashMap<char, Vec<Candidate>> = kanjidic
         .entries
         .iter()
@@ -207,23 +216,44 @@ pub fn count(
         else {
             bail!("JmdictFurigana line {number}: not 3 fields: {text:?}");
         };
-        let Some(word_ids) = words_of.get(&(form, reading)) else {
+        let Some(pairs) = pairs_of.get(&(form, reading)) else {
             furigana.lines_without_word += 1;
             continue;
         };
         let characters: Vec<char> = form.chars().collect();
+        // Each part as (start, length, kana).
+        let mut parsed = Vec::new();
         for part in parts.split(';').filter(|part| !part.is_empty()) {
-            let (index, kana) = part
-                .split_once(':')
-                .with_context(|| format!("JmdictFurigana line {number}: bad part {part:?}"))?;
-            // A range of characters has no reading of 1 kanji.
-            let Ok(index) = index.parse::<usize>() else {
-                continue;
-            };
-            let Some(&character) = characters.get(index) else {
-                bail!("JmdictFurigana line {number}: no character {index} in {form:?}");
-            };
-            let Some(character) = normalize_char(character) else {
+            let bad = || format!("JmdictFurigana line {number}: bad part {part:?}");
+            let (range, kana) = part.split_once(':').with_context(bad)?;
+            let (first, last) = range.split_once('-').unwrap_or((range, range));
+            let (first, last): (usize, usize) = (
+                first.parse().with_context(bad)?,
+                last.parse().with_context(bad)?,
+            );
+            if first > last || last >= characters.len() {
+                bail!("JmdictFurigana line {number}: no characters {range} in {form:?}");
+            }
+            parsed.push((first, last - first + 1, kana));
+        }
+        for &(_, form_id, reading_id) in pairs {
+            // A written form and a reading get the furigana of their first line.
+            if pairs_with_rows.insert((form_id, reading_id)) {
+                for (i, &(start, length, kana)) in parsed.iter().enumerate() {
+                    furigana.rows.push((
+                        form_id,
+                        reading_id,
+                        i as u32 + 1,
+                        start as u32,
+                        length as u32,
+                        kana.to_owned(),
+                    ));
+                }
+            }
+        }
+        // A part of a range of characters, such as 今日, reads no single kanji.
+        for &(index, _, kana) in parsed.iter().filter(|&&(_, length, _)| length == 1) {
+            let Some(character) = normalize_char(characters[index]) else {
                 continue;
             };
             let Some(list) = candidates.get(&character) else {
@@ -247,7 +277,7 @@ pub fn count(
                         .words
                         .entry((character, candidate.position))
                         .or_default();
-                    words.extend(word_ids);
+                    words.extend(pairs.iter().map(|&(word_id, _, _)| word_id));
                 }
                 None => furigana.parts_without_reading += 1,
             }
@@ -395,6 +425,38 @@ mod tests {
         .unwrap();
         let furigana = count(input, None, &words, &kanjidic).unwrap();
         assert_eq!(furigana.word_count('寸', 1), 1);
+    }
+
+    #[test]
+    fn parts_become_furigana_rows() {
+        let kanjidic = kanjidic(&[('語', &[(On, "ゴ")])]);
+        let furigana = run(
+            "語る|かたる|0:かた\n今日|きょう|0-1:きょう\n今日|きょう|0-1:きょう\n",
+            &[(1, "語る", "かたる"), (2, "今日", "きょう")],
+            &kanjidic,
+        );
+        // The second line of 今日 gives no rows: the form and the reading have furigana.
+        assert_eq!(
+            furigana.rows,
+            [
+                (1, 1, 1, 0, 1, "かた".to_owned()),
+                (2, 2, 1, 0, 2, "きょう".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn part_outside_the_form_fails() {
+        let input = source::open(std::io::Cursor::new("語|ご|1:ご\n".as_bytes().to_vec())).unwrap();
+        let error = count(
+            input,
+            None,
+            &entries(&[(1, "語", "ご")]),
+            &Kanjidic::default(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("line 1"), "{error}");
     }
 
     #[test]

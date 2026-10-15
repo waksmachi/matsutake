@@ -255,6 +255,11 @@ sense	31	1000620	1	NULL
 sense	32	1000630	1	NULL
 sense_written_form	22	22
 sense_reading	22	3
+furigana	27	9	1	0	1	かた
+furigana	28	10	1	0	1	かた
+furigana	29	11	1	0	1	やす
+furigana	30	12	1	0	1	ご
+furigana	30	12	2	1	1	じん
 sense_tag	1	2
 sense_tag	2	3
 sense_tag	22	3

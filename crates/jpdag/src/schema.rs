@@ -1,7 +1,7 @@
 //! Schema of `content.db`.
 
 /// Value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
-pub const SCHEMA_VERSION: i32 = 3;
+pub const SCHEMA_VERSION: i32 = 4;
 
 /// Tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
 pub const CREATE_TABLES: &str = "
@@ -96,6 +96,16 @@ CREATE TABLE sense_reading (
   sense_id   INTEGER NOT NULL REFERENCES sense(id),
   reading_id INTEGER NOT NULL REFERENCES reading(id),
   PRIMARY KEY (sense_id, reading_id)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE furigana (
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
+  reading_id      INTEGER NOT NULL REFERENCES reading(id),
+  position        INTEGER NOT NULL,
+  start           INTEGER NOT NULL,                         -- index of the first character
+  length          INTEGER NOT NULL,                         -- number of characters
+  kana            TEXT NOT NULL,
+  PRIMARY KEY (written_form_id, reading_id, position)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE tag (

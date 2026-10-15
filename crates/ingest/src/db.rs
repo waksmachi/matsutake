@@ -18,7 +18,7 @@ pub struct Source {
     pub attribution: &'static str,
 }
 
-/// Rows of the 19 tables. Each character is a code point.
+/// Rows of the 20 tables. Each character is a code point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Rows {
     /// Rows of `word`, the entry tables, and the tag tables.
@@ -34,12 +34,14 @@ pub struct Rows {
     pub character_components: Vec<(u32, u32)>,
     /// Each row as (mutant_id, base_id).
     pub mutants: Vec<(u32, u32)>,
+    /// Each row as (written_form_id, reading_id, position, start, length, kana).
+    pub furigana: Vec<(u32, u32, u32, u32, u32, String)>,
     pub sources: Vec<Source>,
 }
 
 impl Rows {
     /// Number of rows in each table, in schema order.
-    pub fn counts(&self) -> [(&'static str, usize); 19] {
+    pub fn counts(&self) -> [(&'static str, usize); 20] {
         let e = &self.entries;
         [
             ("word", e.words.len()),
@@ -56,6 +58,7 @@ impl Rows {
             ("gloss", e.glosses.len()),
             ("sense_written_form", e.sense_written_forms.len()),
             ("sense_reading", e.sense_readings.len()),
+            ("furigana", self.furigana.len()),
             ("tag", e.tags.len()),
             ("written_form_tag", e.written_form_tags.len()),
             ("reading_tag", e.reading_tags.len()),
@@ -133,6 +136,10 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     let mut insert = tx.prepare("INSERT INTO tag VALUES (?1, ?2, ?3, ?4)")?;
     for t in &e.tags {
         insert.execute(params![t.id, t.category.as_str(), t.name, t.description])?;
+    }
+    let mut insert = tx.prepare("INSERT INTO furigana VALUES (?1, ?2, ?3, ?4, ?5, ?6)")?;
+    for (form_id, reading_id, position, start, length, kana) in &rows.furigana {
+        insert.execute(params![form_id, reading_id, position, start, length, kana])?;
     }
     let mut insert = tx.prepare("INSERT INTO source VALUES (?1, ?2, ?3, ?4)")?;
     for s in &rows.sources {
@@ -281,6 +288,7 @@ mod tests {
             ],
             character_components: vec![(0x4F11, 0x4EBB), (0x4F11, 0x6728)],
             mutants: vec![(0x4EBB, 0x4EBA)],
+            furigana: vec![(1, 1, 1, 0, 1, "やす".into())],
             sources: vec![Source {
                 name: "JMdict",
                 version: Some("2026-09-28".into()),
@@ -296,7 +304,7 @@ mod tests {
         write(&dir, &Rows::default()).unwrap();
         let conn = Connection::open(dir.join("content.db")).unwrap();
         let tables = names(&conn, "table");
-        assert_eq!(tables.len(), 19, "{tables:?}");
+        assert_eq!(tables.len(), 20, "{tables:?}");
         assert_eq!(names(&conn, "index").len(), 8);
         assert_eq!(columns(&conn, "mutant"), ["mutant_id", "base_id"]);
         assert_eq!(

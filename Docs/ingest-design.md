@@ -25,7 +25,7 @@ The `ingest` crate builds the graph in stages.
 
 ## 2. Scope
 
-This design covers 19 tables in 5 groups.
+This design covers 20 tables in 5 groups.
 
 The graph:
 
@@ -55,6 +55,7 @@ The structure of each JMdict entry:
 | `gloss` | English glosses of each sense (`<gloss>`) |
 | `sense_written_form` | Written forms that a sense applies to (`<stagk>`) |
 | `sense_reading` | Readings that a sense applies to (`<stagr>`) |
+| `furigana` | The part of a reading that belongs to each kanji of a written form, from JmdictFurigana |
 
 The JMdict tags:
 
@@ -221,6 +222,16 @@ CREATE TABLE sense_reading (
   PRIMARY KEY (sense_id, reading_id)
 ) STRICT, WITHOUT ROWID;
 
+CREATE TABLE furigana (
+  written_form_id INTEGER NOT NULL REFERENCES written_form(id),
+  reading_id      INTEGER NOT NULL REFERENCES reading(id),
+  position        INTEGER NOT NULL,
+  start           INTEGER NOT NULL,                         -- index of the first character
+  length          INTEGER NOT NULL,                         -- number of characters
+  kana            TEXT NOT NULL,
+  PRIMARY KEY (written_form_id, reading_id, position)
+) STRICT, WITHOUT ROWID;
+
 CREATE TABLE tag (
   id          INTEGER PRIMARY KEY,
   category    TEXT NOT NULL,
@@ -275,8 +286,8 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
 no index on `text`.
 
-This schema is `SCHEMA_VERSION` 3. Version 2 had no `character_reading.word_count`, and version 1
-had no KANJIDIC2 tables.
+This schema is `SCHEMA_VERSION` 4. Version 3 had no `furigana`, version 2 had no
+`character_reading.word_count`, and version 1 had no KANJIDIC2 tables.
 
 Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
 the position, so 2 builds from the same files give the same ids. The ids change when JMdict changes.
@@ -315,7 +326,7 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
        │                6 Read KANJIDIC2 ◄────── kanjidic2.xml.gz
        │                        │
        │                        ▼
-       ├──────────────► 7 Count the readings ◄── JmdictFurigana-*.txt
+       ├──────────────► 7 Read the furigana ◄─── JmdictFurigana-*.txt
        │                        │
        │                        ▼
        └──────────────► 8 Write content.db
@@ -329,7 +340,7 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
 | 4. Read the mutants | `data/mutants.tsv`, and the KanjiVG components of stage 3 | Candidate `mutant` rows |
 | 5. Complete the character set | Stages 2, 3, and 4 | `character`, `character_component`, and `mutant` rows |
 | 6. Read KANJIDIC2 | `kanjidic2.xml.gz`, and the character set of stage 5 | `character_meaning` and `character_reading` rows |
-| 7. Count the readings | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `character_reading.word_count` of each reading |
+| 7. Read the furigana | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `furigana` rows, and `character_reading.word_count` of each reading |
 | 8. Write `content.db` | Stages 1, 2, 3, 5, 6, and 7 | `content.db` |
 
 ### 6.1 Normalization
@@ -644,7 +655,7 @@ If the file has no such element, the version is NULL, and the build report says 
 
 A parse error gives the line number in the decompressed file.
 
-### 6.8 Stage 7: Count the readings
+### 6.8 Stage 7: Read the furigana
 
 A kanji page lists the readings of the kanji in order of use. KANJIDIC2 gives the readings, but not
 how many words use each. JmdictFurigana gives, for each written form and reading of a JMdict entry,
@@ -657,20 +668,24 @@ the part of the reading that belongs to each kanji:
 ```
 
 Each line holds the written form, the reading, and the parts: the index of a character in the
-written form (or a range of characters), then its kana. For each KANJIDIC2 reading of each
-character, stage 7 counts the words that read the character with that reading.
+written form (or a range of characters), then its kana. Stage 7 keeps the parts of each written
+form and reading, so the app can show furigana. For each KANJIDIC2 reading of each character, it
+also counts the words that read the character with that reading.
 
-1. Read `JmdictFurigana-*.txt` line by line. A line that does not have 3 fields stops the build,
-   with its line number.
-2. Find the words with that written form and that reading. If there is none, count the line in
-   the build report, and skip it.
-3. For each part of 1 character: normalize the character, and take its KANJIDIC2 readings. Skip a
+1. Read `JmdictFurigana-*.txt` line by line. A line that does not have 3 fields, or a part outside
+   its written form, stops the build, with its line number.
+2. Find the written forms and readings of the words with that written form and that reading. If
+   there is none, count the line in the build report, and skip it.
+3. Give each written form and reading 1 `furigana` row for each part, in order: the index of its
+   first character, its number of characters, and its kana. A written form and a reading that
+   already have rows keep the rows of their first line.
+4. For each part of 1 character: normalize the character, and take its KANJIDIC2 readings. Skip a
    part for a range of characters, such as 今日, because it reads no single kanji.
-4. Compare the kana of the part with each reading (below). If no reading matches, count the part
+5. Compare the kana of the part with each reading (below). If no reading matches, count the part
    in the build report.
-5. If more than 1 kun reading matches, take the reading whose okurigana share the most kana with
+6. If more than 1 kun reading matches, take the reading whose okurigana share the most kana with
    the text after the character in the written form. A tie goes to the first reading.
-6. Add the words of the line to the words of the reading.
+7. Add the words of the line to the words of the reading.
 
 `word_count` is the number of different words of a reading. A word that reads the character with
 the same reading in 2 written forms counts once.
@@ -693,7 +708,7 @@ Stage 8 writes a new file and replaces `content.db` only after all checks pass. 
 leaves the previous `content.db` unchanged.
 
 1. Open `content.db.tmp` in the output directory.
-2. Create the 19 tables and the indexes with the statements of `jpdag::schema`.
+2. Create the 20 tables and the indexes with the statements of `jpdag::schema`.
 3. Set `PRAGMA user_version` to `SCHEMA_VERSION`.
 4. Insert all rows in 1 transaction.
 5. Run `PRAGMA foreign_key_check`.
@@ -927,13 +942,15 @@ Each row gives the name of the test function of the case.
 | `okurigana_decide_between_kun_readings` | 生かす and 生きる, with the kun readings い.きる and い.かす of 生 | Each reading has 1 word |
 | `irregular_reading_is_reported` | 今日 as きょう (a range), 今日 as こんにち, and ひ of 日 in 日向 when 日 has only ニチ | コン and ニチ each have 1 word. The range is skipped, and the report counts 1 part with no reading. |
 | `a_word_counts_once_for_each_reading` | 2 lines that give the same word the same reading | The reading has 1 word |
+| `parts_become_furigana_rows` | Furigana of 語る, and 2 lines of 今日 with the range `0-1:きょう` | 1 row for 語る with かた over 1 character, and 1 row for 今日 with きょう over 2 characters. The second line of 今日 gives no rows. |
+| `part_outside_the_form_fails` | A part for a character that the written form does not have | Build fails, and the error gives the line number |
 | `version_comes_from_the_file_name` | `JmdictFurigana-2026-09-25.txt`, and `JmdictFurigana.txt` | Version 2026-09-25, and no version |
 
 ### `db.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `empty_build_creates_the_schema` | A build with no rows | 19 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
+| `empty_build_creates_the_schema` | A build with no rows | 20 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
 | `rows_round_trip` | A small set of rows | Same rows in each table |
 | `foreign_key_violation_fails_the_build` | A `written_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
 | `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
@@ -942,7 +959,7 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 19 tables equal the rows in `tests/fixtures/expected.tsv` |
+| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 20 tables equal the rows in `tests/fixtures/expected.tsv` |
 | `two_runs_give_the_same_rows` | 2 runs on the same fixtures | Same rows in each table |
 | `report_counts_match_the_fixtures` | Fixture sources | Counts in the build report that match the fixtures |
 

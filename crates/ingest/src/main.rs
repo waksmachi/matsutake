@@ -115,7 +115,7 @@ fn run(args: &Args) -> Result<String> {
     let kanjidic = kanjidic::parse(source::open_path(&args.kanjidic)?, &set.characters)?;
 
     // Stage 7.
-    let furigana = furigana::count(
+    let mut furigana = furigana::count(
         source::open_path(&args.furigana)?,
         furigana::version_from_path(&args.furigana),
         &entries,
@@ -140,6 +140,7 @@ fn run(args: &Args) -> Result<String> {
         character_readings,
         character_components: set.character_components.iter().map(pair).collect(),
         mutants: set.mutants.iter().map(pair).collect(),
+        furigana: std::mem::take(&mut furigana.rows),
         sources: vec![
             db::Source {
                 name: "JMdict",

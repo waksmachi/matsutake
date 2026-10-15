@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use rusqlite::types::ValueRef;
 
 /// Tables of `content.db`, in schema order.
-const TABLES: [&str; 19] = [
+const TABLES: [&str; 20] = [
     "word",
     "character",
     "character_meaning",
@@ -23,6 +23,7 @@ const TABLES: [&str; 19] = [
     "gloss",
     "sense_written_form",
     "sense_reading",
+    "furigana",
     "tag",
     "written_form_tag",
     "reading_tag",
