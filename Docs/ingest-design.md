@@ -1,4 +1,4 @@
-# Ingest: JMdict, components, kanji details, reading counts, and pitch accents
+# Ingest: JMdict, components, kanji details, reading counts, pitch accents, and word frequency
 
 This document describes the design of the `ingest` crate. `ingest` populates `content.db`, the
 database of the app, from free public data sources.
@@ -22,11 +22,13 @@ The `ingest` crate builds the graph in stages.
 5. *JmdictFurigana* gives the part of the reading of each word that belongs to each kanji. From
    it, ingest counts the words that read each character with each of its KANJIDIC2 readings.
 6. *Kanjium* gives the pitch accents of each reading.
-7. Graph is written from memory into `content.db`.
+7. *Jiten* gives the frequency rank of each word in Japanese TV dramas, written in each of its
+   written forms and in kana.
+8. Graph is written from memory into `content.db`.
 
 ## 2. Scope
 
-This design covers 22 tables in 5 groups.
+This design covers 24 tables in 5 groups.
 
 The graph:
 
@@ -59,6 +61,8 @@ The structure of each JMdict entry:
 | `furigana` | The part of a reading that belongs to each kanji of a written form, from JmdictFurigana |
 | `accent` | The pitch accents of each reading, from Kanjium |
 | `accent_tag` | The parts of speech that an accent belongs to, as `pos` tags |
+| `written_form_frequency` | The frequency rank of the word written in each written form, from Jiten |
+| `reading_frequency` | The frequency rank of the word written in kana as each reading, from Jiten |
 
 The JMdict tags:
 
@@ -101,6 +105,8 @@ The provenance of the data:
 | On reading | A reading of a character that comes from Chinese, in katakana, for example ゴ for 語 |
 | Kun reading | A native Japanese reading of a character, in hiragana, for example かた.る for 語. A `.` comes before the okurigana, and a `-` marks a prefix or a suffix. |
 | Mora | A unit of the rhythm of a reading. Each kana is 1 mora, except a small ゃ, ゅ, ょ, ぁ, ぃ, ぅ, ぇ, ぉ, or ゎ, which joins the kana before it: きょう is 2 morae, きょ and う. A small っ, ん, and ー are each 1 mora. `jpdag::kana::morae` splits a reading into its morae. |
+| Frequency rank | The place of a word in a list of words in order of use: rank 1 is the most frequent. Jiten counts a word in 1 written form, or in kana, so a word can have a rank for each written form and for each reading: 一寸 is rank 47988 as 一寸, and rank 46 as ちょっと. |
+| Common | A written form or a reading that JMdict marks with a priority element (`<ke_pri>` or `<re_pri>`), such as `spec1` or `news1` |
 | Pitch accent | The pattern of high and low pitch of a reading in Tokyo Japanese. Its downstep gives it: the number of morae before the pitch falls, or 0 if it does not fall in the word. はし is 2 as 橋, 1 as 箸, and 0 as 端. A reading can have more than 1 accent. |
 
 ## 4. Datasources
@@ -112,6 +118,7 @@ The provenance of the data:
 | KANJIDIC2 | `kanjidic2.xml.gz` | EDRDG | CC BY-SA 4.0 | Meanings and readings of each character |
 | JmdictFurigana | `JmdictFurigana-YYYY-MM-DD.txt`, from the GitHub release | Doublevil | CC BY-SA, the licence of JMdict | The kanji of each written form that each part of its reading belongs to |
 | Kanjium | `kanjium-accents-COMMIT.txt`, `data/source_files/raw/accents.txt` at a commit of the GitHub repository | Uros O. (mifunetoshiro) | CC BY-SA 4.0 | The pitch accents of each written form and reading |
+| Jiten | `jiten-drama.zip`, the Yomitan frequency dictionary of the drama list of jiten.moe | Jiten | CC BY-SA 4.0 | The frequency rank of each word in the subtitles of Japanese TV dramas |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
 KanjiVG release, for example r20250816. JMdict and KANJIDIC2 have no releases, so the script
@@ -119,13 +126,21 @@ downloads the current files. EDRDG publishes a new file of each on most days. Jm
 release each month. The script downloads the latest release, and names the file with the date of
 its tag, for example `JmdictFurigana-2026-09-25.txt`, because the file holds no version. Kanjium
 has no releases, so the script sets a commit, the last change of `accents.txt` (685d4d7, of
-2024-06-16), and names the file with it, for example `kanjium-accents-685d4d7.txt`.
+2024-06-16), and names the file with it, for example `kanjium-accents-685d4d7.txt`. Jiten
+regenerates its lists each month. The script downloads the current drama list, and the `index.json`
+of the zip gives its date.
+
+Jiten counts the words of the subtitles of about 3,000 Japanese TV dramas. Its other lists, of
+novels, games, and all media together, rank the vocabulary of written fiction higher, and the
+drama list is the nearest to everyday speech. Words that no drama uses have no rank. Past rank
+16000 or so, many words share a rank, because they occur a few times each: the ranks of rare words
+are noise.
 
 `data/mutants.tsv` is not a download. The first 19 rows of the file come from `japanese-radicals.csv`
 of Kanji alive (CC BY 4.0), and the file's header credits Kanji alive (section 6.5).
 
-`content.db` is a derivative of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, and Kanjium, so CC
-BY-SA applies to it. The `source` table
+`content.db` is a derivative of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten, so
+CC BY-SA applies to it. The `source` table
 holds the attribution that each licence asks for, so the app can show it.
 
 The `ingest` binary reads local files only and has no network code. The arguments of the binary give
@@ -255,6 +270,16 @@ CREATE TABLE accent_tag (
   PRIMARY KEY (accent_id, tag_id)
 ) STRICT, WITHOUT ROWID;
 
+CREATE TABLE written_form_frequency (
+  written_form_id INTEGER PRIMARY KEY REFERENCES written_form(id),
+  rank            INTEGER NOT NULL                          -- of the word in this written form
+) STRICT;
+
+CREATE TABLE reading_frequency (
+  reading_id INTEGER PRIMARY KEY REFERENCES reading(id),
+  rank       INTEGER NOT NULL                               -- of the word in kana, as this reading
+) STRICT;
+
 CREATE TABLE tag (
   id          INTEGER PRIMARY KEY,
   category    TEXT NOT NULL,
@@ -283,7 +308,7 @@ CREATE TABLE sense_tag (
 
 CREATE TABLE source (
   name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, KANJIDIC2,
-                                                            -- JmdictFurigana, or Kanjium
+                                                            -- JmdictFurigana, Kanjium, or Jiten
   version     TEXT,                                         -- the file's date, or a commit
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
@@ -309,7 +334,8 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
 no index on `text`.
 
-This schema is `SCHEMA_VERSION` 5. Version 4 had no `accent` and `accent_tag`, version 3 had no
+This schema is `SCHEMA_VERSION` 6. Version 5 had no `written_form_frequency` and
+`reading_frequency`, version 4 had no `accent` and `accent_tag`, version 3 had no
 `furigana`, version 2 had no `character_reading.word_count`, and version 1 had no KANJIDIC2 tables.
 
 Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
@@ -355,7 +381,10 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
        ├──────────────► 8 Read the accents ◄──── kanjium-accents-*.txt
        │                        │
        │                        ▼
-       └──────────────► 9 Write content.db
+       ├──────────────► 9 Read the ranks ◄────── jiten-drama.zip
+       │                        │
+       │                        ▼
+       └──────────────► 10 Write content.db
 ```
 
 | Stage | Input | Output |
@@ -368,7 +397,8 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
 | 6. Read KANJIDIC2 | `kanjidic2.xml.gz`, and the character set of stage 5 | `character_meaning` and `character_reading` rows |
 | 7. Read the furigana | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `furigana` rows, and `character_reading.word_count` of each reading |
 | 8. Read the accents | `kanjium-accents-*.txt`, and the rows of stage 2 | `accent` and `accent_tag` rows, and the `pos` tags that no sense has |
-| 9. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, and 8 | `content.db` |
+| 9. Read the ranks | `jiten-drama.zip`, and the rows of stage 2 | `written_form_frequency` and `reading_frequency` rows |
+| 10. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, 8, and 9 | `content.db` |
 
 ### 6.1 Normalization
 
@@ -399,9 +429,10 @@ The result can have more than 1 code point. For example, normalization gives 平
 1. Read `JMdict_e.gz` as a stream of XML events.
 2. Read each entity declaration of the DTD, and keep its name and its text.
 3. For each `<entry>`, keep the `<ent_seq>` value.
-4. For each `<k_ele>`, keep the `<keb>` text and the `<ke_inf>` tags.
+4. For each `<k_ele>`, keep the `<keb>` text and the `<ke_inf>` tags. Keep whether the element
+   holds a `<ke_pri>`: whether the written form is common.
 5. For each `<r_ele>`, keep the `<reb>` text, the `<re_inf>` tags, and the `<re_restr>` texts. Keep
-   whether the element holds `<re_nokanji/>`.
+   whether the element holds `<re_nokanji/>`, and whether it holds a `<re_pri>`.
 6. For each `<sense>`, keep the `<stagk>` and `<stagr>` texts. Keep the `<pos>`,
    `<field>`, `<misc>`, and `<dial>` tags. Keep the text of each `<gloss>`, and its `g_type` value.
    Keep the text of each `<s_inf>`.
@@ -439,6 +470,7 @@ Stage 2 turns each entry of stage 1 into rows. Each JMdict entry gives 1 `word` 
 8. If a `<re_restr>`, `<stagk>`, or `<stagr>` text names no form of its entry, skip the restriction.
 9. If a sense has no `<pos>` tag, give the sense the `<pos>` tags of the previous sense.
 10. For each tag, add 1 `written_form_tag`, `reading_tag`, or `sense_tag` row.
+11. Keep the ids of the common written forms and readings for stage 9. No table holds them.
 
 The `g_type` value marks a gloss that is not a plain translation: `lit` (literal), `fig`
 (figurative), `expl` (an explanation), or `tm` (a trademark). Most glosses have no `g_type`, so
@@ -786,13 +818,55 @@ no line, and no reading of its word to take accents from, has no `accent` rows: 
 compute an accent from the accents of the parts of a word. The file name gives the version of
 Kanjium. If the name has no commit, the version is NULL, and the build report says so.
 
-### 6.10 Stage 9: Write `content.db`
+### 6.10 Stage 9: Read the ranks
 
-Stage 9 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
+The drama list of Jiten is a Yomitan frequency dictionary: a zip with `index.json` and
+`term_meta_bank_1.json`. Each entry of the bank is a term and a rank:
+
+```
+["方",       "freq", {"reading": "ほう",     "frequency": {"value": 206,   "displayValue": "206"}}]
+["一寸",     "freq", {"reading": "ちょっと", "frequency": {"value": 47988, "displayValue": "47988"}}]
+["一寸",     "freq", {"reading": "ちょっと", "frequency": {"value": 46,    "displayValue": "46㋕"}}]
+["ちょっと", "freq", {"value": 46, "displayValue": "46㋕"}]
+```
+
+An entry with a reading is a written form and a reading of 1 word. Its rank is the rank of the word
+in that written form, or with the mark ㋕, the rank of the word in kana as that reading: 一寸 is
+rank 47988 as 一寸, and rank 46 as ちょっと. Jiten gives the written form 1 rank, so its entries
+with each reading of the word give the same rank. An entry with no reading is a reading in kana.
+Jiten gives it to the first word that has it, from the most frequent word, and it writes each
+reading in kana once. The entries do not name the JMdict entry.
+
+1. Read `index.json`. Its revision, such as `Jiten (Drama) 26-10-09`, gives the version
+   2026-10-09.
+2. Read each `term_meta_bank_N.json` in the order of N. A bank that is not a list of entries stops
+   the build.
+3. For an entry with a reading: find the words with that written form and that reading. If there is
+   none, count the entry in the build report, and skip it. If there is 1, give the rank to its
+   written form, or with the mark ㋕, to its reading.
+4. For an entry with no reading: if an entry with a reading gave the same rank to a reading with
+   that text, the entry is the same word in kana. Skip it.
+5. Else, find the words in kana alone with that reading, or if there are none, all words with that
+   reading. If there is 1, give the rank to its reading.
+6. If step 3 or 5 finds 2 or more words, give the rank to the only 1 whose written form (for a rank
+   with no mark) or reading (for a rank with ㋕) is common. Jiten counts from the most frequent
+   word, and JMdict marks the frequent words as common: は is the particle (`spec1`) and "yes" in
+   kana alone, and the particle has the rank. If no word, or 2 or more words, are common, count the
+   entry in the build report, and skip it.
+7. A written form or a reading with 2 or more ranks keeps the smallest.
+
+The ranks of the list are the ranks of Jiten: rank 1 is the most frequent, and words that occur
+the same number of times share a rank. Stage 9 does not cut the list: the dictionary decides how to
+use the ranks of rare words. The file gives the version of Jiten. If `index.json` has no revision,
+the version is NULL, and the build report says so.
+
+### 6.11 Stage 10: Write `content.db`
+
+Stage 10 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
 leaves the previous `content.db` unchanged.
 
 1. Open `content.db.tmp` in the output directory.
-2. Create the 22 tables and the indexes with the statements of `jpdag::schema`.
+2. Create the 24 tables and the indexes with the statements of `jpdag::schema`.
 3. Set `PRAGMA user_version` to `SCHEMA_VERSION`.
 4. Insert all rows in 1 transaction.
 5. Run `PRAGMA foreign_key_check`.
@@ -803,9 +877,10 @@ leaves the previous `content.db` unchanged.
 The foreign keys are off during the insert. Step 5 checks all rows at the end, and the error gives
 the number of rows that fail. A failed build deletes `content.db.tmp`.
 
-Stage 9 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, and
-Kanjium. The code holds the licence and the attribution text of each source. The versions of JMdict,
-KanjiVG, KANJIDIC2, JmdictFurigana, and Kanjium come from stages 1, 3, 6, 7, and 8. The version of Kanji alive is NULL,
+Stage 10 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana,
+Kanjium, and Jiten. The code holds the licence and the attribution text of each source. The
+versions of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten come from stages 1, 3, 6,
+7, 8, and 9. The version of Kanji alive is NULL,
 because `data/mutants.tsv` holds its data.
 
 The `rusqlite` crate compiles its own SQLite, so `ingest` and the app use the same SQLite version.
@@ -839,6 +914,9 @@ report shows what the sources gave and what the pipeline discarded:
   accents after the last mora of their reading
 - number of readings with an accent, and the number of readings that take the accents of another
   reading of their word
+- number of Jiten entries, the number of entries that are no word, the number of entries of 2 or
+  more words that go to the 1 common word, and the number that go to no word
+- number of words with a rank
 - size of `content.db`
 
 ## 8. Tests and CI
@@ -872,10 +950,11 @@ cargo test -p ingest --test build_checks -- --ignored
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
 | `one_row_for_each_jmdict_element` | Numbers of `written_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
-| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, and Kanjium, and the rows of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, and Kanjium have a version |
+| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten, and the rows of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten have a version |
 | `golden_character_details_exist` | 語 has the meanings word, speech, and language in that order, the on reading ゴ, and the kun readings かた.る and かた.らう |
 | `mutants_keep_their_radical_meanings` | 氵 has the meaning water, and ⻞, which has no KANJIDIC2 entry, has no meaning and no reading |
 | `readings_have_word_counts` | More words use ゴ of 語 than かた.る, かた.る has a count, and ガク of 学 has a count of 100 or more |
+| `words_have_frequency_ranks` | The particles は, が, を, and に, in kana alone, are in the top 10. 方 as ほう has a better rank than 方 as かた. ちょっと of 一寸 has a rank of 100 or better in kana, and a worse rank as 一寸. |
 | `readings_have_accents` | はし has the accent 2 as 橋, 1 as 箸, and 0 as 端. トリ of 鳥 has the accents of とり. ちょいと of 一寸 has 0 with `adv`, and 1 with `adv` and `int`. |
 
 ### CI
@@ -928,6 +1007,7 @@ Each row gives the name of the test function of the case.
 | `sense_keeps_its_note` | A sense with `<s_inf>before a verb in negative form</s_inf>` | Note text of the sense |
 | `creation_comment_gives_the_version` | Comment `<!-- JMdict created: 2026-09-28 -->` | Version 2026-09-28 |
 | `no_creation_comment_gives_no_version` | A file with no creation comment | No version, and the build report says so |
+| `priority_marks_a_common_form` | `<ke_pri>spec1</ke_pri>` on 1 of 2 written forms, and `<re_pri>ichi1</re_pri>` on 1 of 2 readings | Only those are common |
 
 ### `words.rs`
 
@@ -1054,11 +1134,28 @@ Each row gives the name of the test function of the case.
 | `line_of_2_fields_fails` | A line with no accents | Build fails, and the error gives the line number |
 | `version_comes_from_the_file_name` | `kanjium-accents-685d4d7.txt`, and `accents.txt` | Version 685d4d7, and no version |
 
+### `frequency.rs`
+
+| Test | Input | Expected result |
+| --- | --- | --- |
+| `plain_rank_goes_to_the_written_form` | 方 ほう 206 and 方 かた 292, 2 words | Each written form 方 has the rank of its word, and the version is 2026-10-09 |
+| `kana_rank_goes_to_the_reading` | 一寸 with ちょっと 46㋕, ちょいと 6639㋕, and 47988 with each reading | ちょっと has 46, ちょいと has 6639, and 一寸 has 47988 |
+| `best_rank_wins` | 2 entries of 明日 あした, 300 and 100 | 明日 has 100 |
+| `kana_alone_that_a_pair_ranks_is_skipped` | ちょっと 46㋕ with no reading, and 一寸 ちょっと 46㋕, with a word ちょっと in kana alone | Only the reading of 一寸 has 46 |
+| `kana_alone_goes_to_the_word_in_kana_alone` | は 2㋕, with 葉 は and a word は in kana alone | The word in kana alone has 2 |
+| `kana_alone_goes_to_the_only_word_with_the_reading` | やすみ 80㋕, with 休み やすみ | The reading of 休み has 80 |
+| `kana_alone_of_2_words_goes_to_the_common_word` | は 2㋕, with 2 words は in kana alone, 1 common | The common word has 2 |
+| `pair_of_2_words_goes_to_the_word_with_the_common_form` | 一寸 ちょっと 9 and 4㋕, with 2 words, the written form of 1 common | Its written form has 9. No reading is common, so 4 goes to no word. |
+| `entries_of_2_words_are_counted_and_skipped` | 一寸 ちょっと of 2 words, and はし in kana alone of 2 words, none common | No rank, and the report counts 2 entries |
+| `entries_of_no_word_are_counted` | 語学 ごがく and はずだ | The report counts 2 entries |
+| `version_comes_from_the_revision` | `Jiten (Drama) 26-10-09`, and `Jiten (Drama)` | Version 2026-10-09, and the revision as it is |
+| `reads_the_banks_of_a_zip_in_order` | A zip with `term_meta_bank_2.json`, `index.json`, `term_meta_bank_1.json`, and a stylesheet | The index, and the banks in the order 1, 2 |
+
 ### `db.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `empty_build_creates_the_schema` | A build with no rows | 22 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
+| `empty_build_creates_the_schema` | A build with no rows | 24 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
 | `rows_round_trip` | A small set of rows | Same rows in each table |
 | `foreign_key_violation_fails_the_build` | A `written_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
 | `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
@@ -1067,7 +1164,7 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 22 tables equal the rows in `tests/fixtures/expected.tsv` |
+| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 24 tables equal the rows in `tests/fixtures/expected.tsv` |
 | `two_runs_give_the_same_rows` | 2 runs on the same fixtures | Same rows in each table |
 | `report_counts_match_the_fixtures` | Fixture sources | Counts in the build report that match the fixtures |
 
@@ -1087,3 +1184,7 @@ The fixtures hold:
 - Kanjium lines for the readings of 一寸 and 鳥渡 (one with the parts of speech 副 and 感), a line
   of ちょっと with no reading for the entry in kana alone, lines of 明日, 手, and 語る, and 1 line,
   語学, that is not a word of the fixtures. チョット has no line and takes the accents of ちょっと.
+- the Jiten drama list in `jiten-drama/`, as the files of the zip. The test zips them. Its entries
+  give ranks to written forms and readings of 鳥渡, 明日, 語る, and 休み, with 1 entry of 一寸 that
+  is 2 words, 1 entry in kana that an entry with a reading already ranks, and 2 entries that are no
+  word.

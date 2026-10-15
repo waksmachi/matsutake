@@ -1,6 +1,7 @@
 //! Integration test: runs the ingest binary on the fixture sources in `tests/fixtures/`.
 
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -8,7 +9,7 @@ use rusqlite::Connection;
 use rusqlite::types::ValueRef;
 
 /// Tables of `content.db`, in schema order.
-const TABLES: [&str; 22] = [
+const TABLES: [&str; 24] = [
     "word",
     "character",
     "character_meaning",
@@ -26,6 +27,8 @@ const TABLES: [&str; 22] = [
     "furigana",
     "accent",
     "accent_tag",
+    "written_form_frequency",
+    "reading_frequency",
     "tag",
     "written_form_tag",
     "reading_tag",
@@ -52,9 +55,25 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Zips the files of the fixture `jiten-drama/`, as Jiten publishes its Yomitan dictionary, and
+/// gives the path of the zip.
+fn jiten_zip(out: &Path) -> PathBuf {
+    let path = out.with_extension("zip");
+    let mut zip = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+    for name in ["index.json", "term_meta_bank_1.json"] {
+        zip.start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(&fs::read(fixture("jiten-drama").join(name)).unwrap())
+            .unwrap();
+    }
+    zip.finish().unwrap();
+    path
+}
+
 /// Runs the ingest binary with the output directory `out`, and gives the build report.
 fn run_ingest(out: &Path) -> String {
     let _ = fs::remove_dir_all(out);
+    let jiten = jiten_zip(out);
     let output = Command::new(env!("CARGO_BIN_EXE_ingest"))
         .arg("--jmdict")
         .arg(fixture("JMdict_e.xml"))
@@ -66,6 +85,8 @@ fn run_ingest(out: &Path) -> String {
         .arg(fixture("JmdictFurigana-2026-09-25.txt"))
         .arg("--accents")
         .arg(fixture("kanjium-accents-685d4d7.txt"))
+        .arg("--frequency")
+        .arg(jiten)
         .arg("--out")
         .arg(out)
         .output()
@@ -198,6 +219,12 @@ fn report_counts_match_the_fixtures() {
         "Accents after the last mora of their reading: 0",
         "Readings with an accent: 9",
         "Readings that take the accents of another reading of their word: 1",
+        "  Jiten                2026-10-09",
+        "Jiten entries: 12",
+        "Jiten entries that are no written form and reading of a word: 2",
+        "Jiten entries of 2 or more words that go to the 1 that JMdict marks as common: 0",
+        "Jiten entries of 2 or more words that go to no word: 1",
+        "Words with a rank: 4",
     ] {
         assert!(
             report.lines().any(|l| l == line),

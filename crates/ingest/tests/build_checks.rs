@@ -226,6 +226,7 @@ fn sources_have_versions() {
         "KANJIDIC2",
         "JmdictFurigana",
         "Kanjium",
+        "Jiten",
     ] {
         assert!(sources.contains_key(name), "no source row for {name}");
     }
@@ -235,6 +236,7 @@ fn sources_have_versions() {
         "KANJIDIC2",
         "JmdictFurigana",
         "Kanjium",
+        "Jiten",
     ] {
         assert!(
             sources[name].is_some(),
@@ -340,4 +342,50 @@ fn readings_have_accents() {
     // An accent has the pos tags of its parts of speech, and 2 parts of speech with the same
     // downstep share 1 accent.
     assert_eq!(accents("一寸", "ちょいと"), ["0 adv", "1 adv int"]);
+}
+
+#[test]
+#[ignore]
+fn words_have_frequency_ranks() {
+    let conn = content_db();
+    let rank = |sql: &str, params: &[&str]| -> Option<i64> {
+        conn.query_row(sql, rusqlite::params_from_iter(params), |r| r.get(0))
+            .ok()
+    };
+    // The rank of a reading written in kana, of the word in kana alone with that reading.
+    let kana = |text: &str| {
+        rank(
+            "SELECT rf.rank FROM reading r JOIN reading_frequency rf ON rf.reading_id = r.id
+             WHERE r.text = ?1 AND NOT EXISTS (
+               SELECT 1 FROM written_form f WHERE f.word_id = r.word_id)
+             ORDER BY rf.rank LIMIT 1",
+            &[text],
+        )
+    };
+    // The rank of a written form, of the word whose first reading is `reading`.
+    let form = |text: &str, reading: &str| {
+        rank(
+            "SELECT ff.rank FROM written_form f
+             JOIN written_form_frequency ff ON ff.written_form_id = f.id
+             JOIN reading r ON r.word_id = f.word_id AND r.position = 1
+             WHERE f.text = ?1 AND r.text = ?2",
+            &[text, reading],
+        )
+    };
+    // The particles are among the most frequent words, though は and が each have 2 words in
+    // kana alone.
+    for particle in ["は", "が", "を", "に"] {
+        assert!(kana(particle).is_some_and(|r| r <= 10), "{particle}");
+    }
+    // 方 is ほう more often than かた.
+    assert!(form("方", "ほう") < form("方", "かた"));
+    // ちょっと is written in kana far more often than as 一寸.
+    let in_kana = rank(
+        "SELECT rf.rank FROM written_form f JOIN reading r ON r.word_id = f.word_id
+         JOIN reading_frequency rf ON rf.reading_id = r.id
+         WHERE f.text = '一寸' AND r.text = 'ちょっと'",
+        &[],
+    );
+    assert!(in_kana.is_some_and(|r| r <= 100));
+    assert!(form("一寸", "ちょっと") > in_kana);
 }

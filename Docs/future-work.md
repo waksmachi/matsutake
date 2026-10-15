@@ -15,8 +15,9 @@ design says what it does, and an item moves from this list into a design when it
 
 ## 2. Frequency and order
 
-- frequency of each word: `word.zipf`, and the priority values of `<ke_pri>` and `<re_pri>` of
-  JMdict
+- use of the frequency ranks of each word, which `content.db` holds from Jiten, in the dictionary
+  API and the app. `ingest` reads `<ke_pri>` and `<re_pri>` of JMdict only to decide between 2
+  words.
 - frequency of each character. `ingest` does not read the `<freq>` rank of KANJIDIC2.
 - lists in order of frequency. These lists now end in the word id or the code point:
   - search results that tie on rules 1 to 3 of the search order

@@ -69,6 +69,7 @@ jobs:
           --kanjidic sources/kanjidic2.xml.gz
           --furigana sources/JmdictFurigana-*.txt
           --accents sources/kanjium-accents-*.txt
+          --frequency sources/jiten-drama.zip
           --out out
       - name: Add the build report to the job summary
         run: |

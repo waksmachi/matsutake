@@ -19,6 +19,8 @@ sources=(
   "kanjidic2.xml.gz https://www.edrdg.org/kanjidic/kanjidic2.xml.gz"
   "$kanjivg_file https://github.com/KanjiVG/kanjivg/releases/download/$kanjivg_release/$kanjivg_file"
   "$kanjium_file https://raw.githubusercontent.com/mifunetoshiro/kanjium/$kanjium_commit/data/source_files/raw/accents.txt"
+  # Jiten regenerates its lists each month. The Yomitan dictionary gives its date in index.json.
+  "jiten-drama.zip https://api.jiten.moe/api/frequency-list/download?mediaType=Drama"
 )
 
 # JmdictFurigana has a release each month. The tag of the release, for example 2.3.1+2026-09-25,

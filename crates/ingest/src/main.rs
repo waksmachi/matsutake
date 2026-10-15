@@ -1,10 +1,11 @@
 //! Builds the tables of `content.db` from JMdict, KanjiVG, `data/mutants.tsv`, KANJIDIC2,
-//! JmdictFurigana, and Kanjium.
+//! JmdictFurigana, Kanjium, and Jiten.
 //! `Docs/ingest-design.md` describes the pipeline.
 
 mod accents;
 mod components;
 mod db;
+mod frequency;
 mod furigana;
 mod jmdict;
 mod kanji_links;
@@ -14,7 +15,7 @@ mod mutants;
 mod source;
 mod words;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
@@ -24,7 +25,7 @@ use anyhow::{Context, Result, bail};
 
 const USAGE: &str = "usage: ingest --jmdict JMdict_e.gz --kanjivg kanjivg-YYYYMMDD.xml.gz \
 --kanjidic kanjidic2.xml.gz --furigana JmdictFurigana-YYYY-MM-DD.txt \
---accents kanjium-accents-COMMIT.txt --out DIR";
+--accents kanjium-accents-COMMIT.txt --frequency jiten-drama.zip --out DIR";
 
 const JMDICT_ATTRIBUTION: &str = "This app uses the JMdict dictionary file. The file is the \
 property of the Electronic Dictionary Research and Development Group, and is used in conformance \
@@ -50,19 +51,24 @@ homonyms and other additions or modifications to EDICT, KANJIDIC or KRADFILE wer
 Uros O. through his free database, Kanjium, under the Creative Commons Attribution-ShareAlike 4.0 \
 licence. https://github.com/mifunetoshiro/kanjium";
 
+const JITEN_ATTRIBUTION: &str = "This app uses the word frequency list of dramas of Jiten, under \
+the Creative Commons Attribution-ShareAlike 4.0 licence. https://jiten.moe";
+
 struct Args {
     jmdict: PathBuf,
     kanjivg: PathBuf,
     kanjidic: PathBuf,
     furigana: PathBuf,
     accents: PathBuf,
+    frequency: PathBuf,
     out: PathBuf,
 }
 
 fn parse_args() -> Result<Args> {
     let mut args = std::env::args_os().skip(1);
-    let (mut jmdict, mut kanjivg, mut kanjidic, mut furigana, mut accents, mut out) =
+    let (mut jmdict, mut kanjivg, mut kanjidic, mut furigana, mut accents, mut frequency) =
         (None, None, None, None, None, None);
+    let mut out = None;
     while let Some(flag) = args.next() {
         let slot = match flag.to_str() {
             Some("--jmdict") => &mut jmdict,
@@ -70,6 +76,7 @@ fn parse_args() -> Result<Args> {
             Some("--kanjidic") => &mut kanjidic,
             Some("--furigana") => &mut furigana,
             Some("--accents") => &mut accents,
+            Some("--frequency") => &mut frequency,
             Some("--out") => &mut out,
             _ => bail!("unknown argument {flag:?}\n{USAGE}"),
         };
@@ -87,6 +94,7 @@ fn parse_args() -> Result<Args> {
         kanjidic: need(kanjidic, "--kanjidic")?,
         furigana: need(furigana, "--furigana")?,
         accents: need(accents, "--accents")?,
+        frequency: need(frequency, "--frequency")?,
         out: need(out, "--out")?,
     })
 }
@@ -101,6 +109,7 @@ struct Findings {
     kanjidic: kanjidic::Kanjidic,
     furigana: furigana::Furigana,
     accents: accents::Accents,
+    frequency: frequency::Frequency,
 }
 
 fn run(args: &Args) -> Result<String> {
@@ -142,6 +151,9 @@ fn run(args: &Args) -> Result<String> {
     )?;
 
     // Stage 9.
+    let mut frequency = frequency::read(&args.frequency, &entries)?;
+
+    // Stage 10.
     let character_readings = kanjidic
         .reading_rows()
         .into_iter()
@@ -162,6 +174,8 @@ fn run(args: &Args) -> Result<String> {
         furigana: std::mem::take(&mut furigana.rows),
         accents: std::mem::take(&mut accents.rows),
         accent_tags: std::mem::take(&mut accents.tags),
+        written_form_frequencies: std::mem::take(&mut frequency.form_rows),
+        reading_frequencies: std::mem::take(&mut frequency.reading_rows),
         sources: vec![
             db::Source {
                 name: "JMdict",
@@ -199,6 +213,12 @@ fn run(args: &Args) -> Result<String> {
                 licence: "CC BY-SA 4.0",
                 attribution: KANJIUM_ATTRIBUTION,
             },
+            db::Source {
+                name: "Jiten",
+                version: frequency.version.clone(),
+                licence: "CC BY-SA 4.0",
+                attribution: JITEN_ATTRIBUTION,
+            },
         ],
     };
     fs::create_dir_all(&args.out)
@@ -213,6 +233,7 @@ fn run(args: &Args) -> Result<String> {
         kanjidic,
         furigana,
         accents,
+        frequency,
     };
     Ok(report(&rows, &findings, size))
 }
@@ -234,6 +255,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
             (None, "KANJIDIC2") => "none: the file has no <date_of_creation> element".into(),
             (None, "JmdictFurigana") => "none: the file name has no date".into(),
             (None, "Kanjium") => "none: the file name has no commit".into(),
+            (None, "Jiten") => "none: the index has no revision".into(),
             (None, _) => "none: the file has no version comment".into(),
         };
         let _ = writeln!(r, "  {:<20} {version}", source.name);
@@ -310,6 +332,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
     report_kanjidic(&mut r, findings);
     report_furigana(&mut r, &findings.furigana);
     report_accents(&mut r, &findings.accents, &rows.accents);
+    report_frequency(&mut r, &findings.frequency, rows);
 
     let _ = writeln!(
         r,
@@ -426,6 +449,46 @@ fn report_accents(r: &mut String, accents: &accents::Accents, rows: &[(u32, u32,
         "Readings that take the accents of another reading of their word: {}",
         accents.shared_readings
     );
+}
+
+/// Adds the findings of stage 9 to the report `r`.
+fn report_frequency(r: &mut String, frequency: &frequency::Frequency, rows: &db::Rows) {
+    let _ = writeln!(r, "\nJiten entries: {}", frequency.entries);
+    let _ = writeln!(
+        r,
+        "Jiten entries that are no written form and reading of a word: {}",
+        frequency.entries_without_word
+    );
+    let _ = writeln!(
+        r,
+        "Jiten entries of 2 or more words that go to the 1 that JMdict marks as common: {}",
+        frequency.ties_broken
+    );
+    let _ = writeln!(
+        r,
+        "Jiten entries of 2 or more words that go to no word: {}",
+        frequency.ambiguous_entries
+    );
+    let entries = &rows.entries;
+    let form_words: HashMap<u32, u32> = entries
+        .written_forms
+        .iter()
+        .map(|f| (f.id, f.word_id))
+        .collect();
+    let reading_words: HashMap<u32, u32> =
+        entries.readings.iter().map(|r| (r.id, r.word_id)).collect();
+    let words: HashSet<u32> = rows
+        .written_form_frequencies
+        .iter()
+        .filter_map(|(id, _)| form_words.get(id))
+        .chain(
+            rows.reading_frequencies
+                .iter()
+                .filter_map(|(id, _)| reading_words.get(id)),
+        )
+        .copied()
+        .collect();
+    let _ = writeln!(r, "Words with a rank: {}", words.len());
 }
 
 fn main() -> ExitCode {

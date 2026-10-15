@@ -82,6 +82,8 @@ pub struct WrittenForm {
     pub text: String,
     /// `<ke_inf>` tags.
     pub tags: Vec<String>,
+    /// True if the element holds a `<ke_pri>`: JMdict marks the written form as common.
+    pub common: bool,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -94,6 +96,8 @@ pub struct Reading {
     pub restrictions: Vec<String>,
     /// `<re_inf>` tags.
     pub tags: Vec<String>,
+    /// True if the element holds a `<re_pri>`: JMdict marks the reading as common.
+    pub common: bool,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -218,6 +222,16 @@ pub fn parse(input: Source) -> Result<Jmdict> {
                         "re_inf" => {
                             if let Some(r) = e.readings.last_mut() {
                                 r.tags.push(tag());
+                            }
+                        }
+                        "ke_pri" => {
+                            if let Some(k) = e.written_forms.last_mut() {
+                                k.common = true;
+                            }
+                        }
+                        "re_pri" => {
+                            if let Some(r) = e.readings.last_mut() {
+                                r.common = true;
                             }
                         }
                         "re_restr" => {
@@ -371,10 +385,12 @@ mod tests {
                 WrittenForm {
                     text: "一寸".into(),
                     tags: vec!["ateji".into()],
+                    common: false,
                 },
                 WrittenForm {
                     text: "鳥渡".into(),
                     tags: vec!["ateji".into(), "iK".into()],
+                    common: false,
                 },
             ],
             readings: vec![Reading {
@@ -568,5 +584,25 @@ mod tests {
     #[test]
     fn no_creation_comment_gives_no_version() {
         assert_eq!(parse_str("").unwrap().version, None);
+    }
+    #[test]
+    fn priority_marks_a_common_form() {
+        let jmdict = parse(
+            source::open(Cursor::new(
+                "<JMdict><entry><ent_seq>1</ent_seq>
+<k_ele><keb>一寸</keb><ke_pri>spec1</ke_pri></k_ele><k_ele><keb>鳥渡</keb></k_ele>
+<r_ele><reb>ちょっと</reb><re_pri>ichi1</re_pri></r_ele><r_ele><reb>ちょと</reb></r_ele>
+</entry></JMdict>"
+                    .as_bytes()
+                    .to_vec(),
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let entry = &jmdict.entries[0];
+        let forms: Vec<bool> = entry.written_forms.iter().map(|k| k.common).collect();
+        let readings: Vec<bool> = entry.readings.iter().map(|r| r.common).collect();
+        assert_eq!(forms, [true, false]);
+        assert_eq!(readings, [true, false]);
     }
 }

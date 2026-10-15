@@ -69,6 +69,7 @@ mod tests {
                 .map(|(text, tags)| WrittenForm {
                     text: (*text).into(),
                     tags: tags.iter().map(|t| (*t).into()).collect(),
+                    common: false,
                 })
                 .collect(),
             senses: vec![Sense {

@@ -76,6 +76,11 @@ pub struct EntryRows {
     /// Each row as (sense_id, tag_id).
     pub sense_tags: Vec<(u32, u32)>,
     pub skipped_restrictions: Vec<SkippedRestriction>,
+    /// Ids of the written forms that JMdict marks as common (`<ke_pri>`). No table holds them:
+    /// stage 9 uses them to decide between 2 words.
+    pub common_written_forms: Vec<u32>,
+    /// Ids of the readings that JMdict marks as common (`<re_pri>`).
+    pub common_readings: Vec<u32>,
 }
 
 impl EntryRows {
@@ -152,6 +157,9 @@ impl Builder<'_> {
                 text: k.text.clone(),
             });
             kanji_ids.entry(&k.text).or_insert(id);
+            if k.common {
+                self.rows.common_written_forms.push(id);
+            }
             for tag in &k.tags {
                 let tag_id = self.tag_id(Category::KeInf, tag);
                 self.written_form_tags.add((id, tag_id));
@@ -168,6 +176,9 @@ impl Builder<'_> {
                 no_kanji: r.no_kanji,
             });
             reading_ids.entry(&r.text).or_insert(id);
+            if r.common {
+                self.rows.common_readings.push(id);
+            }
             for tag in &r.tags {
                 let tag_id = self.tag_id(Category::ReInf, tag);
                 self.reading_tags.add((id, tag_id));
@@ -276,6 +287,7 @@ mod tests {
         WrittenForm {
             text: text.into(),
             tags: tags.iter().map(|t| (*t).into()).collect(),
+            common: false,
         }
     }
 

@@ -1,0 +1,14 @@
+[
+["一寸","freq",{"reading":"ちょっと","frequency":{"value":900,"displayValue":"900"}}],
+["鳥渡","freq",{"reading":"ちょっと","frequency":{"value":1200,"displayValue":"1200"}}],
+["鳥渡","freq",{"reading":"ちょっと","frequency":{"value":46,"displayValue":"46㋕"}}],
+["鳥渡","freq",{"reading":"チョット","frequency":{"value":3000,"displayValue":"3000㋕"}}],
+["ちょっと","freq",{"value":46,"displayValue":"46㋕"}],
+["語る","freq",{"reading":"かたる","frequency":{"value":500,"displayValue":"500"}}],
+["明日","freq",{"reading":"あした","frequency":{"value":100,"displayValue":"100"}}],
+["明日","freq",{"reading":"あす","frequency":{"value":100,"displayValue":"100"}}],
+["明日","freq",{"reading":"あした","frequency":{"value":7000,"displayValue":"7000㋕"}}],
+["やすみ","freq",{"value":80,"displayValue":"80㋕"}],
+["語学","freq",{"reading":"ごがく","frequency":{"value":9,"displayValue":"9"}}],
+["はずだ","freq",{"value":40,"displayValue":"40㋕"}]
+]

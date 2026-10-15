@@ -18,7 +18,7 @@ pub struct Source {
     pub attribution: &'static str,
 }
 
-/// Rows of the 22 tables. Each character is a code point.
+/// Rows of the 24 tables. Each character is a code point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Rows {
     /// Rows of `word`, the entry tables, and the tag tables.
@@ -40,12 +40,16 @@ pub struct Rows {
     pub accents: Vec<(u32, u32, u32, u32)>,
     /// Each row as (accent_id, tag_id).
     pub accent_tags: Vec<(u32, u32)>,
+    /// Each row as (written_form_id, rank).
+    pub written_form_frequencies: Vec<(u32, u32)>,
+    /// Each row as (reading_id, rank).
+    pub reading_frequencies: Vec<(u32, u32)>,
     pub sources: Vec<Source>,
 }
 
 impl Rows {
     /// Number of rows in each table, in schema order.
-    pub fn counts(&self) -> [(&'static str, usize); 22] {
+    pub fn counts(&self) -> [(&'static str, usize); 24] {
         let e = &self.entries;
         [
             ("word", e.words.len()),
@@ -65,6 +69,11 @@ impl Rows {
             ("furigana", self.furigana.len()),
             ("accent", self.accents.len()),
             ("accent_tag", self.accent_tags.len()),
+            (
+                "written_form_frequency",
+                self.written_form_frequencies.len(),
+            ),
+            ("reading_frequency", self.reading_frequencies.len()),
             ("tag", e.tags.len()),
             ("written_form_tag", e.written_form_tags.len()),
             ("reading_tag", e.reading_tags.len()),
@@ -166,6 +175,8 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
         ("reading_tag", &e.reading_tags),
         ("sense_tag", &e.sense_tags),
         ("accent_tag", &rows.accent_tags),
+        ("written_form_frequency", &rows.written_form_frequencies),
+        ("reading_frequency", &rows.reading_frequencies),
     ] {
         insert_pairs(tx, table, pairs)?;
     }
@@ -289,6 +300,8 @@ mod tests {
                 reading_tags: vec![(1, 1)],
                 sense_tags: vec![(1, 1)],
                 skipped_restrictions: vec![],
+                common_written_forms: vec![],
+                common_readings: vec![],
             },
             written_form_kanji: vec![(1, 0x4F11)],
             characters: vec![0x4EBA, 0x4EBB, 0x4F11, 0x6728],
@@ -302,6 +315,8 @@ mod tests {
             furigana: vec![(1, 1, 1, 0, 1, "やす".into())],
             accents: vec![(1, 1, 1, 2)],
             accent_tags: vec![(1, 1)],
+            written_form_frequencies: vec![(1, 120)],
+            reading_frequencies: vec![(1, 300)],
             sources: vec![Source {
                 name: "JMdict",
                 version: Some("2026-09-28".into()),
@@ -317,7 +332,7 @@ mod tests {
         write(&dir, &Rows::default()).unwrap();
         let conn = Connection::open(dir.join("content.db")).unwrap();
         let tables = names(&conn, "table");
-        assert_eq!(tables.len(), 22, "{tables:?}");
+        assert_eq!(tables.len(), 24, "{tables:?}");
         assert_eq!(names(&conn, "index").len(), 8);
         assert_eq!(columns(&conn, "mutant"), ["mutant_id", "base_id"]);
         assert_eq!(
