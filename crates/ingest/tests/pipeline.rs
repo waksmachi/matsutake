@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use rusqlite::types::ValueRef;
 
 /// Tables of `content.db`, in schema order.
-const TABLES: [&str; 20] = [
+const TABLES: [&str; 22] = [
     "word",
     "character",
     "character_meaning",
@@ -24,6 +24,8 @@ const TABLES: [&str; 20] = [
     "sense_written_form",
     "sense_reading",
     "furigana",
+    "accent",
+    "accent_tag",
     "tag",
     "written_form_tag",
     "reading_tag",
@@ -62,6 +64,8 @@ fn run_ingest(out: &Path) -> String {
         .arg(fixture("kanjidic2.xml"))
         .arg("--furigana")
         .arg(fixture("JmdictFurigana-2026-09-25.txt"))
+        .arg("--accents")
+        .arg(fixture("kanjium-accents-685d4d7.txt"))
         .arg("--out")
         .arg(out)
         .output()
@@ -188,6 +192,12 @@ fn report_counts_match_the_fixtures() {
         "JmdictFurigana lines that are not a written form and a reading of 1 word: 1",
         "Furigana of 1 kanji that are none of its KANJIDIC2 readings: 0",
         "KANJIDIC2 readings that 1 or more words use: 3",
+        "  Kanjium              685d4d7",
+        "Kanjium lines: 9",
+        "Kanjium lines that give no reading an accent: 1",
+        "Accents after the last mora of their reading: 0",
+        "Readings with an accent: 9",
+        "Readings that take the accents of another reading of their word: 1",
     ] {
         assert!(
             report.lines().any(|l| l == line),

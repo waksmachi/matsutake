@@ -1,4 +1,4 @@
-# Ingest: JMdict, components, kanji details, and reading counts
+# Ingest: JMdict, components, kanji details, reading counts, and pitch accents
 
 This document describes the design of the `ingest` crate. `ingest` populates `content.db`, the
 database of the app, from free public data sources.
@@ -21,11 +21,12 @@ The `ingest` crate builds the graph in stages.
    KANJIDIC2 adds no character to the graph.
 5. *JmdictFurigana* gives the part of the reading of each word that belongs to each kanji. From
    it, ingest counts the words that read each character with each of its KANJIDIC2 readings.
-6. Graph is written from memory into `content.db`.
+6. *Kanjium* gives the pitch accents of each reading.
+7. Graph is written from memory into `content.db`.
 
 ## 2. Scope
 
-This design covers 20 tables in 5 groups.
+This design covers 22 tables in 5 groups.
 
 The graph:
 
@@ -56,6 +57,8 @@ The structure of each JMdict entry:
 | `sense_written_form` | Written forms that a sense applies to (`<stagk>`) |
 | `sense_reading` | Readings that a sense applies to (`<stagr>`) |
 | `furigana` | The part of a reading that belongs to each kanji of a written form, from JmdictFurigana |
+| `accent` | The pitch accents of each reading, from Kanjium |
+| `accent_tag` | The parts of speech that an accent belongs to, as `pos` tags |
 
 The JMdict tags:
 
@@ -97,6 +100,8 @@ The provenance of the data:
 | Meaning | An English word or phrase for 1 character, for example "language" for 語. Each `<meaning>` element with no `m_lang` attribute gives 1 meaning. |
 | On reading | A reading of a character that comes from Chinese, in katakana, for example ゴ for 語 |
 | Kun reading | A native Japanese reading of a character, in hiragana, for example かた.る for 語. A `.` comes before the okurigana, and a `-` marks a prefix or a suffix. |
+| Mora | A unit of the rhythm of a reading. Each kana is 1 mora, except a small ゃ, ゅ, ょ, ぁ, ぃ, ぅ, ぇ, ぉ, or ゎ, which joins the kana before it: きょう is 2 morae, きょ and う. A small っ, ん, and ー are each 1 mora. `jpdag::kana::morae` splits a reading into its morae. |
+| Pitch accent | The pattern of high and low pitch of a reading in Tokyo Japanese. Its downstep gives it: the number of morae before the pitch falls, or 0 if it does not fall in the word. はし is 2 as 橋, 1 as 箸, and 0 as 端. A reading can have more than 1 accent. |
 
 ## 4. Datasources
 
@@ -106,18 +111,21 @@ The provenance of the data:
 | KanjiVG | `kanjivg-YYYYMMDD.xml.gz`, from the GitHub release | KanjiVG project | CC BY-SA 3.0 | Components of each character |
 | KANJIDIC2 | `kanjidic2.xml.gz` | EDRDG | CC BY-SA 4.0 | Meanings and readings of each character |
 | JmdictFurigana | `JmdictFurigana-YYYY-MM-DD.txt`, from the GitHub release | Doublevil | CC BY-SA, the licence of JMdict | The kanji of each written form that each part of its reading belongs to |
+| Kanjium | `kanjium-accents-COMMIT.txt`, `data/source_files/raw/accents.txt` at a commit of the GitHub repository | Uros O. (mifunetoshiro) | CC BY-SA 4.0 | The pitch accents of each written form and reading |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
 KanjiVG release, for example r20250816. JMdict and KANJIDIC2 have no releases, so the script
 downloads the current files. EDRDG publishes a new file of each on most days. JmdictFurigana has a
 release each month. The script downloads the latest release, and names the file with the date of
-its tag, for example `JmdictFurigana-2026-09-25.txt`, because the file holds no version.
+its tag, for example `JmdictFurigana-2026-09-25.txt`, because the file holds no version. Kanjium
+has no releases, so the script sets a commit, the last change of `accents.txt` (685d4d7, of
+2024-06-16), and names the file with it, for example `kanjium-accents-685d4d7.txt`.
 
 `data/mutants.tsv` is not a download. The first 19 rows of the file come from `japanese-radicals.csv`
 of Kanji alive (CC BY 4.0), and the file's header credits Kanji alive (section 6.5).
 
-`content.db` is a derivative of JMdict, KanjiVG, KANJIDIC2, and JmdictFurigana, so CC BY-SA applies
-to it. The `source` table
+`content.db` is a derivative of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, and Kanjium, so CC
+BY-SA applies to it. The `source` table
 holds the attribution that each licence asks for, so the app can show it.
 
 The `ingest` binary reads local files only and has no network code. The arguments of the binary give
@@ -232,6 +240,21 @@ CREATE TABLE furigana (
   PRIMARY KEY (written_form_id, reading_id, position)
 ) STRICT, WITHOUT ROWID;
 
+CREATE TABLE accent (
+  id         INTEGER PRIMARY KEY,
+  reading_id INTEGER NOT NULL REFERENCES reading(id),
+  position   INTEGER NOT NULL,
+  downstep   INTEGER NOT NULL,                              -- morae before the fall in pitch,
+                                                            -- or 0 for no fall
+  UNIQUE (reading_id, position)
+) STRICT;
+
+CREATE TABLE accent_tag (
+  accent_id INTEGER NOT NULL REFERENCES accent(id),
+  tag_id    INTEGER NOT NULL REFERENCES tag(id),
+  PRIMARY KEY (accent_id, tag_id)
+) STRICT, WITHOUT ROWID;
+
 CREATE TABLE tag (
   id          INTEGER PRIMARY KEY,
   category    TEXT NOT NULL,
@@ -260,8 +283,8 @@ CREATE TABLE sense_tag (
 
 CREATE TABLE source (
   name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, KANJIDIC2,
-                                                            -- or JmdictFurigana
-  version     TEXT,                                         -- the file's date
+                                                            -- JmdictFurigana, or Kanjium
+  version     TEXT,                                         -- the file's date, or a commit
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
 ) STRICT;
@@ -286,8 +309,8 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
 no index on `text`.
 
-This schema is `SCHEMA_VERSION` 4. Version 3 had no `furigana`, version 2 had no
-`character_reading.word_count`, and version 1 had no KANJIDIC2 tables.
+This schema is `SCHEMA_VERSION` 5. Version 4 had no `accent` and `accent_tag`, version 3 had no
+`furigana`, version 2 had no `character_reading.word_count`, and version 1 had no KANJIDIC2 tables.
 
 Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
 the position, so 2 builds from the same files give the same ids. The ids change when JMdict changes.
@@ -329,7 +352,10 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
        ├──────────────► 7 Read the furigana ◄─── JmdictFurigana-*.txt
        │                        │
        │                        ▼
-       └──────────────► 8 Write content.db
+       ├──────────────► 8 Read the accents ◄──── kanjium-accents-*.txt
+       │                        │
+       │                        ▼
+       └──────────────► 9 Write content.db
 ```
 
 | Stage | Input | Output |
@@ -341,7 +367,8 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
 | 5. Complete the character set | Stages 2, 3, and 4 | `character`, `character_component`, and `mutant` rows |
 | 6. Read KANJIDIC2 | `kanjidic2.xml.gz`, and the character set of stage 5 | `character_meaning` and `character_reading` rows |
 | 7. Read the furigana | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `furigana` rows, and `character_reading.word_count` of each reading |
-| 8. Write `content.db` | Stages 1, 2, 3, 5, 6, and 7 | `content.db` |
+| 8. Read the accents | `kanjium-accents-*.txt`, and the rows of stage 2 | `accent` and `accent_tag` rows, and the `pos` tags that no sense has |
+| 9. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, and 8 | `content.db` |
 
 ### 6.1 Normalization
 
@@ -702,13 +729,67 @@ Other sound changes, and the readings that KANJIDIC2 does not list, match no rea
 gives the version of JmdictFurigana. If the name has no date, the version is NULL, and the build
 report says so.
 
-### 6.9 Stage 8: Write `content.db`
+### 6.9 Stage 8: Read the accents
 
-Stage 8 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
+Kanjium gives the pitch accents of each written form and reading:
+
+```
+橋	はし	2
+１０月	じゅうがつ	4,0
+２つ	ふたつ	(副)0,(名)3
+ああ		0
+```
+
+Each line holds the written form, the reading, and the accents, with a tab between them. A word in
+kana alone has its kana as the written form, and no reading. Each accent is its downstep. 2 or more
+accents are variants, in order. A part of speech in brackets holds for each accent after it, up to
+the next part of speech: ２つ is 0 as an adverb (副), and 3 as a noun (名). `(名;形動)` gives 2 parts
+of speech. Kanjium writes 5 parts of speech, and stage 8 gives each the JMdict `pos` tag of the same
+part of speech:
+
+| Kanjium | `pos` tag |
+| --- | --- |
+| 名 | `n` |
+| 副 | `adv` |
+| 形動 | `adj-na` |
+| 代 | `pn` |
+| 感 | `int` |
+
+1. Read `kanjium-accents-*.txt` line by line. A line that does not have 3 fields, an accent that is
+   not a number, or an unknown part of speech stops the build, with its line number.
+2. Skip an accent whose downstep is greater than the number of morae of its reading, and count it
+   in the build report. A written form and a reading that repeat keep the accents of their first
+   line.
+3. For each reading, take the written forms that it reads, in position order: each written form of
+   its word, or the written forms of its `<re_restr>` restrictions. A reading with `<re_nokanji/>`
+   reads none.
+4. The first written form with a line gives the accents of the reading. A later written form adds
+   only the accents with a downstep that the reading does not have: 十月 gives じゅうがつ 4, and
+   １０月 adds 0, so じゅうがつ has 4 and 0.
+5. A reading that reads no written form takes the accents of the line with its kana and no
+   reading. A reading that reads a written form never takes such a line: the line of a word in kana
+   alone, such as はし, is not the accent of 橋 or 箸.
+6. A reading with no accents takes the accents of the first reading of its word that is the same in
+   hiragana: チョット takes the accents of ちょっと. The 2 readings are the same word with the same
+   sound, so they have the same accent. Count these readings in the build report.
+7. Give each accent of each reading 1 `accent` row, with its position, and 1 `accent_tag` row for
+   each of its parts of speech. If no sense uses a `pos` tag, add the tag, with its description
+   from the JMdict DTD.
+8. Count the lines that give no reading an accent in the build report.
+
+Kanjium does not name a JMdict entry, only a written form and a reading. 2 entries with the same
+written form and reading get the same accents, though their accents can differ. A reading that has
+no line, and no reading of its word to take accents from, has no `accent` rows: stage 8 does not
+compute an accent from the accents of the parts of a word. The file name gives the version of
+Kanjium. If the name has no commit, the version is NULL, and the build report says so.
+
+### 6.10 Stage 9: Write `content.db`
+
+Stage 9 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
 leaves the previous `content.db` unchanged.
 
 1. Open `content.db.tmp` in the output directory.
-2. Create the 20 tables and the indexes with the statements of `jpdag::schema`.
+2. Create the 22 tables and the indexes with the statements of `jpdag::schema`.
 3. Set `PRAGMA user_version` to `SCHEMA_VERSION`.
 4. Insert all rows in 1 transaction.
 5. Run `PRAGMA foreign_key_check`.
@@ -719,9 +800,9 @@ leaves the previous `content.db` unchanged.
 The foreign keys are off during the insert. Step 5 checks all rows at the end, and the error gives
 the number of rows that fail. A failed build deletes `content.db.tmp`.
 
-Stage 8 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, and JmdictFurigana. The
-code holds the licence and the attribution text of each source. The versions of JMdict, KanjiVG,
-KANJIDIC2, and JmdictFurigana come from stages 1, 3, 6, and 7. The version of Kanji alive is NULL,
+Stage 9 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, and
+Kanjium. The code holds the licence and the attribution text of each source. The versions of JMdict,
+KanjiVG, KANJIDIC2, JmdictFurigana, and Kanjium come from stages 1, 3, 6, 7, and 8. The version of Kanji alive is NULL,
 because `data/mutants.tsv` holds its data.
 
 The `rusqlite` crate compiles its own SQLite, so `ingest` and the app use the same SQLite version.
@@ -751,6 +832,10 @@ report shows what the sources gave and what the pipeline discarded:
   reading of 1 word
 - number of parts of 1 kanji whose kana are none of its KANJIDIC2 readings
 - number of KANJIDIC2 readings that 1 or more words use
+- number of Kanjium lines, the number of lines that give no reading an accent, and the number of
+  accents after the last mora of their reading
+- number of readings with an accent, and the number of readings that take the accents of another
+  reading of their word
 - size of `content.db`
 
 ## 8. Tests and CI
@@ -784,10 +869,11 @@ cargo test -p ingest --test build_checks -- --ignored
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
 | `one_row_for_each_jmdict_element` | Numbers of `written_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
-| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, and JmdictFurigana, and the rows of JMdict, KanjiVG, KANJIDIC2, and JmdictFurigana have a version |
+| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, and Kanjium, and the rows of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, and Kanjium have a version |
 | `golden_character_details_exist` | 語 has the meanings word, speech, and language in that order, the on reading ゴ, and the kun readings かた.る and かた.らう |
 | `mutants_keep_their_radical_meanings` | 氵 has the meaning water, and ⻞, which has no KANJIDIC2 entry, has no meaning and no reading |
 | `readings_have_word_counts` | More words use ゴ of 語 than かた.る, かた.る has a count, and ガク of 学 has a count of 100 or more |
+| `readings_have_accents` | はし has the accent 2 as 橋, 1 as 箸, and 0 as 端. トリ of 鳥 has the accents of とり. 1 accent of ちょいと of 一寸 is 1 as an interjection (`int`). |
 
 ### CI
 
@@ -946,11 +1032,29 @@ Each row gives the name of the test function of the case.
 | `part_outside_the_form_fails` | A part for a character that the written form does not have | Build fails, and the error gives the line number |
 | `version_comes_from_the_file_name` | `JmdictFurigana-2026-09-25.txt`, and `JmdictFurigana.txt` | Version 2026-09-25, and no version |
 
+### `accents.rs`
+
+| Test | Input | Expected result |
+| --- | --- | --- |
+| `each_reading_gets_the_accents_of_its_form` | 橋 はし 2, and 箸 はし 1 | The reading of 橋 has 2, and the reading of 箸 has 1 |
+| `variants_keep_their_order` | １０月 じゅうがつ 4,0 | 4 at position 1, and 0 at position 2 |
+| `later_forms_add_only_new_downsteps` | 十月 じゅうがつ 4, and １０月 じゅうがつ 4,0, with 十月 as the first written form | 4, then 0 |
+| `parts_of_speech_become_pos_tags` | 二つ ふたつ (副)1,0,(名)3, with a tag `n` and no tag `adv` | 1 and 0 have the new tag `adv`, with its description from the DTD, and 3 has `n` |
+| `several_parts_of_speech_share_an_accent` | (名;副)1 | 1 accent with the tags `n` and `adv` |
+| `unknown_part_of_speech_fails` | (動)1 on line 2 | Build fails, and the error gives the line number |
+| `kana_line_gives_the_accents_of_a_reading_of_no_form` | ああ with no reading, a word ああ with no written form, and 嗚呼 ああ | Only the word with no written form has the accent |
+| `reading_reads_only_its_restricted_forms` | 一寸 ちょと, when ちょと reads only 鳥渡 | No accent, and the report counts the line |
+| `katakana_reading_shares_the_accents_of_its_hiragana` | 鳥 とり 0, and トリ with `<re_nokanji/>` | Both readings have 0, and the report counts 1 shared reading |
+| `accent_past_the_end_is_counted_and_skipped` | 言論機関 げんろんきかん 8,7 | 7 only, and the report counts 1 accent |
+| `line_of_no_word_is_counted` | 端 はし, and はし with no reading, when the only word is 橋 | No accent, and the report counts 2 lines |
+| `line_of_2_fields_fails` | A line with no accents | Build fails, and the error gives the line number |
+| `version_comes_from_the_file_name` | `kanjium-accents-685d4d7.txt`, and `accents.txt` | Version 685d4d7, and no version |
+
 ### `db.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `empty_build_creates_the_schema` | A build with no rows | 20 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
+| `empty_build_creates_the_schema` | A build with no rows | 22 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
 | `rows_round_trip` | A small set of rows | Same rows in each table |
 | `foreign_key_violation_fails_the_build` | A `written_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
 | `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
@@ -959,7 +1063,7 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 20 tables equal the rows in `tests/fixtures/expected.tsv` |
+| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 22 tables equal the rows in `tests/fixtures/expected.tsv` |
 | `two_runs_give_the_same_rows` | 2 runs on the same fixtures | Same rows in each table |
 | `report_counts_match_the_fixtures` | Fixture sources | Counts in the build report that match the fixtures |
 
@@ -976,3 +1080,6 @@ The fixtures hold:
   1 entry of a compatibility ideograph. The other characters of the fixtures have no entry.
 - JmdictFurigana lines for the JMdict entries 語る, 語り, 休み, and 吾人, and 1 line, 語学, that is
   not a word of the fixtures
+- Kanjium lines for the readings of 一寸 and 鳥渡 (one with the parts of speech 副 and 感), a line
+  of ちょっと with no reading for the entry in kana alone, lines of 明日, 手, and 語る, and 1 line,
+  語学, that is not a word of the fixtures. チョット has no line and takes the accents of ちょっと.

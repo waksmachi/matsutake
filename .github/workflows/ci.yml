@@ -50,7 +50,8 @@ jobs:
         id: date
         run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
       # The cache key holds the date, so the workflow downloads the sources 1 time each day at most.
-      # The key also holds the hash of fetch.sh, which gives the KanjiVG release.
+      # The key also holds the hash of fetch.sh, which gives the KanjiVG release and the Kanjium
+      # commit.
       - name: Restore the sources of today
         id: cache
         uses: actions/cache@v6
@@ -67,6 +68,7 @@ jobs:
           --kanjivg sources/kanjivg-*.xml.gz
           --kanjidic sources/kanjidic2.xml.gz
           --furigana sources/JmdictFurigana-*.txt
+          --accents sources/kanjium-accents-*.txt
           --out out
       - name: Add the build report to the job summary
         run: |

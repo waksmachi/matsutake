@@ -1,7 +1,8 @@
-//! Builds the tables of `content.db` from JMdict, KanjiVG, `data/mutants.tsv`, KANJIDIC2, and
-//! JmdictFurigana.
+//! Builds the tables of `content.db` from JMdict, KanjiVG, `data/mutants.tsv`, KANJIDIC2,
+//! JmdictFurigana, and Kanjium.
 //! `Docs/ingest-design.md` describes the pipeline.
 
+mod accents;
 mod components;
 mod db;
 mod furigana;
@@ -22,7 +23,8 @@ use std::process::ExitCode;
 use anyhow::{Context, Result, bail};
 
 const USAGE: &str = "usage: ingest --jmdict JMdict_e.gz --kanjivg kanjivg-YYYYMMDD.xml.gz \
---kanjidic kanjidic2.xml.gz --furigana JmdictFurigana-YYYY-MM-DD.txt --out DIR";
+--kanjidic kanjidic2.xml.gz --furigana JmdictFurigana-YYYY-MM-DD.txt \
+--accents kanjium-accents-COMMIT.txt --out DIR";
 
 const JMDICT_ATTRIBUTION: &str = "This app uses the JMdict dictionary file. The file is the \
 property of the Electronic Dictionary Research and Development Group, and is used in conformance \
@@ -43,24 +45,31 @@ const FURIGANA_ATTRIBUTION: &str = "This app uses JmdictFurigana by Doublevil, u
 Creative Commons Attribution-ShareAlike licence of JMdict. \
 https://github.com/Doublevil/JmdictFurigana";
 
+const KANJIUM_ATTRIBUTION: &str = "The pitch accent notation, verb particle data, phonetics, \
+homonyms and other additions or modifications to EDICT, KANJIDIC or KRADFILE were provided by \
+Uros O. through his free database, Kanjium, under the Creative Commons Attribution-ShareAlike 4.0 \
+licence. https://github.com/mifunetoshiro/kanjium";
+
 struct Args {
     jmdict: PathBuf,
     kanjivg: PathBuf,
     kanjidic: PathBuf,
     furigana: PathBuf,
+    accents: PathBuf,
     out: PathBuf,
 }
 
 fn parse_args() -> Result<Args> {
     let mut args = std::env::args_os().skip(1);
-    let (mut jmdict, mut kanjivg, mut kanjidic, mut furigana, mut out) =
-        (None, None, None, None, None);
+    let (mut jmdict, mut kanjivg, mut kanjidic, mut furigana, mut accents, mut out) =
+        (None, None, None, None, None, None);
     while let Some(flag) = args.next() {
         let slot = match flag.to_str() {
             Some("--jmdict") => &mut jmdict,
             Some("--kanjivg") => &mut kanjivg,
             Some("--kanjidic") => &mut kanjidic,
             Some("--furigana") => &mut furigana,
+            Some("--accents") => &mut accents,
             Some("--out") => &mut out,
             _ => bail!("unknown argument {flag:?}\n{USAGE}"),
         };
@@ -77,6 +86,7 @@ fn parse_args() -> Result<Args> {
         kanjivg: need(kanjivg, "--kanjivg")?,
         kanjidic: need(kanjidic, "--kanjidic")?,
         furigana: need(furigana, "--furigana")?,
+        accents: need(accents, "--accents")?,
         out: need(out, "--out")?,
     })
 }
@@ -90,6 +100,7 @@ struct Findings {
     form_kanji: BTreeSet<char>,
     kanjidic: kanjidic::Kanjidic,
     furigana: furigana::Furigana,
+    accents: accents::Accents,
 }
 
 fn run(args: &Args) -> Result<String> {
@@ -97,7 +108,7 @@ fn run(args: &Args) -> Result<String> {
     let jmdict = jmdict::parse(source::open_path(&args.jmdict)?)?;
 
     // Stage 2.
-    let entries = words::build(&jmdict);
+    let mut entries = words::build(&jmdict);
     let kanji_links = kanji_links::link(&entries.written_forms);
 
     // Stage 3.
@@ -123,6 +134,14 @@ fn run(args: &Args) -> Result<String> {
     )?;
 
     // Stage 8.
+    let mut accents = accents::read(
+        source::open_path(&args.accents)?,
+        accents::version_from_path(&args.accents),
+        &mut entries,
+        &jmdict.entities,
+    )?;
+
+    // Stage 9.
     let character_readings = kanjidic
         .reading_rows()
         .into_iter()
@@ -141,6 +160,8 @@ fn run(args: &Args) -> Result<String> {
         character_components: set.character_components.iter().map(pair).collect(),
         mutants: set.mutants.iter().map(pair).collect(),
         furigana: std::mem::take(&mut furigana.rows),
+        accents: std::mem::take(&mut accents.rows),
+        accent_tags: std::mem::take(&mut accents.tags),
         sources: vec![
             db::Source {
                 name: "JMdict",
@@ -172,6 +193,12 @@ fn run(args: &Args) -> Result<String> {
                 licence: "CC BY-SA 4.0",
                 attribution: FURIGANA_ATTRIBUTION,
             },
+            db::Source {
+                name: "Kanjium",
+                version: accents.version.clone(),
+                licence: "CC BY-SA 4.0",
+                attribution: KANJIUM_ATTRIBUTION,
+            },
         ],
     };
     fs::create_dir_all(&args.out)
@@ -185,6 +212,7 @@ fn run(args: &Args) -> Result<String> {
         form_kanji: kanji_links.iter().map(|&(_, k)| k).collect(),
         kanjidic,
         furigana,
+        accents,
     };
     Ok(report(&rows, &findings, size))
 }
@@ -205,6 +233,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
             (None, "Kanji alive") => "none (data/mutants.tsv holds its data)".into(),
             (None, "KANJIDIC2") => "none: the file has no <date_of_creation> element".into(),
             (None, "JmdictFurigana") => "none: the file name has no date".into(),
+            (None, "Kanjium") => "none: the file name has no commit".into(),
             (None, _) => "none: the file has no version comment".into(),
         };
         let _ = writeln!(r, "  {:<20} {version}", source.name);
@@ -280,6 +309,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
 
     report_kanjidic(&mut r, findings);
     report_furigana(&mut r, &findings.furigana);
+    report_accents(&mut r, &findings.accents, &rows.accents);
 
     let _ = writeln!(
         r,
@@ -370,6 +400,31 @@ fn report_furigana(r: &mut String, furigana: &furigana::Furigana) {
         r,
         "KANJIDIC2 readings that 1 or more words use: {}",
         furigana.readings_in_use()
+    );
+}
+
+/// Adds the findings of stage 8 to the report `r`.
+fn report_accents(r: &mut String, accents: &accents::Accents, rows: &[(u32, u32, u32, u32)]) {
+    let _ = writeln!(r, "\nKanjium lines: {}", accents.lines);
+    let _ = writeln!(
+        r,
+        "Kanjium lines that give no reading an accent: {}",
+        accents.lines_without_word
+    );
+    let _ = writeln!(
+        r,
+        "Accents after the last mora of their reading: {}",
+        accents.accents_past_the_end
+    );
+    let readings: std::collections::HashSet<u32> = rows
+        .iter()
+        .map(|&(_, reading_id, _, _)| reading_id)
+        .collect();
+    let _ = writeln!(r, "Readings with an accent: {}", readings.len());
+    let _ = writeln!(
+        r,
+        "Readings that take the accents of another reading of their word: {}",
+        accents.shared_readings
     );
 }
 

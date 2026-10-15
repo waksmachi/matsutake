@@ -18,7 +18,7 @@ pub struct Source {
     pub attribution: &'static str,
 }
 
-/// Rows of the 20 tables. Each character is a code point.
+/// Rows of the 22 tables. Each character is a code point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Rows {
     /// Rows of `word`, the entry tables, and the tag tables.
@@ -36,12 +36,16 @@ pub struct Rows {
     pub mutants: Vec<(u32, u32)>,
     /// Each row as (written_form_id, reading_id, position, start, length, kana).
     pub furigana: Vec<(u32, u32, u32, u32, u32, String)>,
+    /// Each row as (id, reading_id, position, downstep).
+    pub accents: Vec<(u32, u32, u32, u32)>,
+    /// Each row as (accent_id, tag_id).
+    pub accent_tags: Vec<(u32, u32)>,
     pub sources: Vec<Source>,
 }
 
 impl Rows {
     /// Number of rows in each table, in schema order.
-    pub fn counts(&self) -> [(&'static str, usize); 20] {
+    pub fn counts(&self) -> [(&'static str, usize); 22] {
         let e = &self.entries;
         [
             ("word", e.words.len()),
@@ -59,6 +63,8 @@ impl Rows {
             ("sense_written_form", e.sense_written_forms.len()),
             ("sense_reading", e.sense_readings.len()),
             ("furigana", self.furigana.len()),
+            ("accent", self.accents.len()),
+            ("accent_tag", self.accent_tags.len()),
             ("tag", e.tags.len()),
             ("written_form_tag", e.written_form_tags.len()),
             ("reading_tag", e.reading_tags.len()),
@@ -141,6 +147,10 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     for (form_id, reading_id, position, start, length, kana) in &rows.furigana {
         insert.execute(params![form_id, reading_id, position, start, length, kana])?;
     }
+    let mut insert = tx.prepare("INSERT INTO accent VALUES (?1, ?2, ?3, ?4)")?;
+    for (id, reading_id, position, downstep) in &rows.accents {
+        insert.execute(params![id, reading_id, position, downstep])?;
+    }
     let mut insert = tx.prepare("INSERT INTO source VALUES (?1, ?2, ?3, ?4)")?;
     for s in &rows.sources {
         insert.execute(params![s.name, s.version, s.licence, s.attribution])?;
@@ -155,6 +165,7 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
         ("written_form_tag", &e.written_form_tags),
         ("reading_tag", &e.reading_tags),
         ("sense_tag", &e.sense_tags),
+        ("accent_tag", &rows.accent_tags),
     ] {
         insert_pairs(tx, table, pairs)?;
     }
@@ -289,6 +300,8 @@ mod tests {
             character_components: vec![(0x4F11, 0x4EBB), (0x4F11, 0x6728)],
             mutants: vec![(0x4EBB, 0x4EBA)],
             furigana: vec![(1, 1, 1, 0, 1, "やす".into())],
+            accents: vec![(1, 1, 1, 2)],
+            accent_tags: vec![(1, 1)],
             sources: vec![Source {
                 name: "JMdict",
                 version: Some("2026-09-28".into()),
@@ -304,7 +317,7 @@ mod tests {
         write(&dir, &Rows::default()).unwrap();
         let conn = Connection::open(dir.join("content.db")).unwrap();
         let tables = names(&conn, "table");
-        assert_eq!(tables.len(), 20, "{tables:?}");
+        assert_eq!(tables.len(), 22, "{tables:?}");
         assert_eq!(names(&conn, "index").len(), 8);
         assert_eq!(columns(&conn, "mutant"), ["mutant_id", "base_id"]);
         assert_eq!(

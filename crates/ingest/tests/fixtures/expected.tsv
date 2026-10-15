@@ -260,6 +260,21 @@ furigana	28	10	1	0	1	かた
 furigana	29	11	1	0	1	やす
 furigana	30	12	1	0	1	ご
 furigana	30	12	2	1	1	じん
+accent	1	1	1	1
+accent	2	1	2	0
+accent	3	2	1	1
+accent	4	3	1	1
+accent	5	3	2	0
+accent	6	4	1	1
+accent	7	4	2	0
+accent	8	5	1	1
+accent	9	5	2	0
+accent	10	6	1	3
+accent	11	7	1	2
+accent	12	8	1	1
+accent	13	9	1	0
+accent_tag	6	7
+accent_tag	7	8
 sense_tag	1	2
 sense_tag	2	3
 sense_tag	22	3
@@ -278,6 +293,7 @@ source	KANJIDIC2	2026-10-01	CC BY-SA 4.0	…
 source	Kanji alive	NULL	CC BY 4.0	…
 source	KanjiVG	2025-08-16	CC BY-SA 3.0	…
 source	JmdictFurigana	2026-09-25	CC BY-SA 4.0	…
+source	Kanjium	685d4d7	CC BY-SA 4.0	…
 tag	1	ke_inf	rK	rarely used kanji form
 tag	10	field	med	medicine
 tag	11	dial	ksb	Kansai-ben

@@ -1,4 +1,5 @@
-//! Kana: the romaji conversion, and the conversion between hiragana and katakana.
+//! Kana: the romaji conversion, the conversion between hiragana and katakana, and the morae of a
+//! reading.
 
 use std::sync::LazyLock;
 
@@ -84,6 +85,44 @@ pub fn to_katakana(text: &str) -> String {
             _ => c,
         })
         .collect()
+}
+
+/// Splits a reading into its morae, the units of its rhythm and its pitch. A small ゃ, ゅ, ょ, ぁ,
+/// ぃ, ぅ, ぇ, ぉ, or ゎ (or its katakana) joins the kana before it: きょう is きょ and う. A small っ,
+/// ん, and ー are each a mora.
+pub fn morae(text: &str) -> Vec<&str> {
+    let mut morae: Vec<&str> = Vec::new();
+    let mut start = 0;
+    for (index, c) in text.char_indices() {
+        let joins = matches!(
+            c,
+            'ゃ' | 'ゅ'
+                | 'ょ'
+                | 'ぁ'
+                | 'ぃ'
+                | 'ぅ'
+                | 'ぇ'
+                | 'ぉ'
+                | 'ゎ'
+                | 'ャ'
+                | 'ュ'
+                | 'ョ'
+                | 'ァ'
+                | 'ィ'
+                | 'ゥ'
+                | 'ェ'
+                | 'ォ'
+                | 'ヮ'
+        );
+        if index > 0 && !joins {
+            morae.push(&text[start..index]);
+            start = index;
+        }
+    }
+    if start < text.len() {
+        morae.push(&text[start..]);
+    }
+    morae
 }
 
 #[cfg(test)]
@@ -175,6 +214,17 @@ mod tests {
         assert_eq!(hiragana("食べmasu"), "食べます");
         // The rows of the table for punctuation are not used.
         assert_eq!(hiragana("a.i"), "あ.い");
+    }
+
+    #[test]
+    fn small_kana_join_the_kana_before() {
+        assert_eq!(morae("きょう"), ["きょ", "う"]);
+        assert_eq!(morae("がっこう"), ["が", "っ", "こ", "う"]);
+        assert_eq!(morae("コーヒー"), ["コ", "ー", "ヒ", "ー"]);
+        assert_eq!(morae("ほんや"), ["ほ", "ん", "や"]);
+        assert_eq!(morae("ティッシュ"), ["ティ", "ッ", "シュ"]);
+        assert_eq!(morae("ゃ"), ["ゃ"]);
+        assert!(morae("").is_empty());
     }
 
     #[test]

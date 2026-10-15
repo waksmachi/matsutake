@@ -1,7 +1,7 @@
 //! Schema of `content.db`.
 
 /// Value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
-pub const SCHEMA_VERSION: i32 = 4;
+pub const SCHEMA_VERSION: i32 = 5;
 
 /// Tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
 pub const CREATE_TABLES: &str = "
@@ -108,6 +108,21 @@ CREATE TABLE furigana (
   PRIMARY KEY (written_form_id, reading_id, position)
 ) STRICT, WITHOUT ROWID;
 
+CREATE TABLE accent (
+  id         INTEGER PRIMARY KEY,
+  reading_id INTEGER NOT NULL REFERENCES reading(id),
+  position   INTEGER NOT NULL,
+  downstep   INTEGER NOT NULL,                              -- morae before the fall in pitch,
+                                                            -- or 0 for no fall
+  UNIQUE (reading_id, position)
+) STRICT;
+
+CREATE TABLE accent_tag (
+  accent_id INTEGER NOT NULL REFERENCES accent(id),
+  tag_id    INTEGER NOT NULL REFERENCES tag(id),
+  PRIMARY KEY (accent_id, tag_id)
+) STRICT, WITHOUT ROWID;
+
 CREATE TABLE tag (
   id          INTEGER PRIMARY KEY,
   category    TEXT NOT NULL,
@@ -136,8 +151,8 @@ CREATE TABLE sense_tag (
 
 CREATE TABLE source (
   name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, KANJIDIC2,
-                                                            -- or JmdictFurigana
-  version     TEXT,                                         -- the file's date
+                                                            -- JmdictFurigana, or Kanjium
+  version     TEXT,                                         -- the file's date, or a commit
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
 ) STRICT;

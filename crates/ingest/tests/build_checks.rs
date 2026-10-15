@@ -225,10 +225,17 @@ fn sources_have_versions() {
         "Kanji alive",
         "KANJIDIC2",
         "JmdictFurigana",
+        "Kanjium",
     ] {
         assert!(sources.contains_key(name), "no source row for {name}");
     }
-    for name in ["JMdict", "KanjiVG", "KANJIDIC2", "JmdictFurigana"] {
+    for name in [
+        "JMdict",
+        "KanjiVG",
+        "KANJIDIC2",
+        "JmdictFurigana",
+        "Kanjium",
+    ] {
         assert!(
             sources[name].is_some(),
             "the source row of {name} has no version"
@@ -300,4 +307,36 @@ fn readings_have_word_counts() {
     assert!(word_count('語', "かた.る") > 0);
     // 学 is がっ in 学校, and 1 count covers both forms of the reading.
     assert!(word_count('学', "ガク") >= 100);
+}
+
+#[test]
+#[ignore]
+fn readings_have_accents() {
+    let conn = content_db();
+    // The accents of the reading `reading` of the word whose first written form is `form`, each
+    // as its downstep and its pos tags.
+    let accents = |form: &str, reading: &str| -> Vec<String> {
+        conn.prepare(
+            "SELECT a.downstep || coalesce(' ' || (
+               SELECT group_concat(t.name, ' ') FROM accent_tag x JOIN tag t ON t.id = x.tag_id
+               WHERE x.accent_id = a.id), '')
+             FROM written_form f JOIN reading r ON r.word_id = f.word_id
+             JOIN accent a ON a.reading_id = r.id
+             WHERE f.position = 1 AND f.text = ?1 AND r.text = ?2
+             ORDER BY a.position",
+        )
+        .unwrap()
+        .query_map([form, reading], |r| r.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap()
+    };
+    // 3 words of はし, each with its own accent.
+    assert_eq!(accents("橋", "はし"), ["2"]);
+    assert_eq!(accents("箸", "はし"), ["1"]);
+    assert_eq!(accents("端", "はし"), ["0"]);
+    // トリ has no line of its own, and takes the accent of とり.
+    assert_eq!(accents("鳥", "トリ"), accents("鳥", "とり"));
+    // An accent of 1 part of speech has its pos tag.
+    assert!(accents("一寸", "ちょいと").contains(&"1 int".to_owned()));
 }
