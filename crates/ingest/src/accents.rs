@@ -66,7 +66,7 @@ pub fn version_from_path(path: &Path) -> Option<String> {
 fn parse(field: &str, reading: &str, number: u64, past_the_end: &mut usize) -> Result<Vec<Accent>> {
     let length = morae(reading).len() as u32;
     let mut parts_of_speech: Vec<&'static str> = Vec::new();
-    let mut accents = Vec::new();
+    let mut accents: Vec<Accent> = Vec::new();
     for token in field.split(',') {
         let bad = || format!("Kanjium line {number}: bad accent {token:?}");
         let downstep = match token.strip_prefix('(') {
@@ -93,12 +93,23 @@ fn parse(field: &str, reading: &str, number: u64, past_the_end: &mut usize) -> R
             *past_the_end += 1;
             continue;
         }
-        let accent = Accent {
-            downstep,
-            parts_of_speech: parts_of_speech.clone(),
-        };
-        if !accents.contains(&accent) {
-            accents.push(accent);
+        // An accent with the downstep of an earlier accent joins it: (副)1,(感)1 is 1 accent of
+        // an adverb and an interjection. An accent with no part of speech belongs to each, so the
+        // joined accent has none.
+        match accents.iter_mut().find(|a| a.downstep == downstep) {
+            Some(accent) if accent.parts_of_speech.is_empty() => {}
+            Some(accent) if parts_of_speech.is_empty() => accent.parts_of_speech.clear(),
+            Some(accent) => {
+                for &name in &parts_of_speech {
+                    if !accent.parts_of_speech.contains(&name) {
+                        accent.parts_of_speech.push(name);
+                    }
+                }
+            }
+            None => accents.push(Accent {
+                downstep,
+                parts_of_speech: parts_of_speech.clone(),
+            }),
         }
     }
     Ok(accents)
@@ -368,6 +379,22 @@ mod tests {
             words.tags[1].description.as_deref(),
             Some("adverb (fukushi)")
         );
+    }
+
+    #[test]
+    fn accents_of_the_same_downstep_join() {
+        let mut words = entries(&[(1, &["一寸"], &["ちょいと"]), (2, &["二つ"], &["ふたつ"])]);
+        let accents = run(
+            "一寸\tちょいと\t(副)0,1,(感)1\n二つ\tふたつ\t3,(名)3\n",
+            &mut words,
+        )
+        .unwrap();
+        // ちょいと is 0 as an adverb, and 1 as an adverb and an interjection. ふたつ is 3 for
+        // each part of speech.
+        assert_eq!(accents.rows, [(1, 1, 1, 0), (2, 1, 2, 1), (3, 2, 1, 3)]);
+        assert_eq!(words.tags[0].name, "adv");
+        assert_eq!(words.tags[1].name, "int");
+        assert_eq!(accents.tags, [(1, 1), (2, 1), (2, 2)]);
     }
 
     #[test]

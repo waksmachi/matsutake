@@ -758,8 +758,11 @@ part of speech:
 1. Read `kanjium-accents-*.txt` line by line. A line that does not have 3 fields, an accent that is
    not a number, or an unknown part of speech stops the build, with its line number.
 2. Skip an accent whose downstep is greater than the number of morae of its reading, and count it
-   in the build report. A written form and a reading that repeat keep the accents of their first
-   line.
+   in the build report. An accent with the downstep of an earlier accent of the line joins it, with
+   the parts of speech of both: `(副)0,1,(感)1` gives 0 as an adverb, and 1 as an adverb and an
+   interjection. If either has no part of speech, the joined accent has none, because it belongs
+   to each part of speech. A written form and a reading that repeat keep the accents of their
+   first line.
 3. For each reading, take the written forms that it reads, in position order: each written form of
    its word, or the written forms of its `<re_restr>` restrictions. A reading with `<re_nokanji/>`
    reads none.
@@ -873,7 +876,7 @@ cargo test -p ingest --test build_checks -- --ignored
 | `golden_character_details_exist` | 語 has the meanings word, speech, and language in that order, the on reading ゴ, and the kun readings かた.る and かた.らう |
 | `mutants_keep_their_radical_meanings` | 氵 has the meaning water, and ⻞, which has no KANJIDIC2 entry, has no meaning and no reading |
 | `readings_have_word_counts` | More words use ゴ of 語 than かた.る, かた.る has a count, and ガク of 学 has a count of 100 or more |
-| `readings_have_accents` | はし has the accent 2 as 橋, 1 as 箸, and 0 as 端. トリ of 鳥 has the accents of とり. 1 accent of ちょいと of 一寸 is 1 as an interjection (`int`). |
+| `readings_have_accents` | はし has the accent 2 as 橋, 1 as 箸, and 0 as 端. トリ of 鳥 has the accents of とり. ちょいと of 一寸 has 0 with `adv`, and 1 with `adv` and `int`. |
 
 ### CI
 
@@ -1041,6 +1044,7 @@ Each row gives the name of the test function of the case.
 | `later_forms_add_only_new_downsteps` | 十月 じゅうがつ 4, and １０月 じゅうがつ 4,0, with 十月 as the first written form | 4, then 0 |
 | `parts_of_speech_become_pos_tags` | 二つ ふたつ (副)1,0,(名)3, with a tag `n` and no tag `adv` | 1 and 0 have the new tag `adv`, with its description from the DTD, and 3 has `n` |
 | `several_parts_of_speech_share_an_accent` | (名;副)1 | 1 accent with the tags `n` and `adv` |
+| `accents_of_the_same_downstep_join` | ちょいと (副)0,1,(感)1, and ふたつ 3,(名)3 | ちょいと has 0 with `adv`, and 1 with `adv` and `int`. ふたつ has 3 with no tag. |
 | `unknown_part_of_speech_fails` | (動)1 on line 2 | Build fails, and the error gives the line number |
 | `kana_line_gives_the_accents_of_a_reading_of_no_form` | ああ with no reading, a word ああ with no written form, and 嗚呼 ああ | Only the word with no written form has the accent |
 | `reading_reads_only_its_restricted_forms` | 一寸 ちょと, when ちょと reads only 鳥渡 | No accent, and the report counts the line |

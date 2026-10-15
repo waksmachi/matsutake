@@ -337,6 +337,7 @@ fn readings_have_accents() {
     assert_eq!(accents("端", "はし"), ["0"]);
     // トリ has no line of its own, and takes the accent of とり.
     assert_eq!(accents("鳥", "トリ"), accents("鳥", "とり"));
-    // An accent of 1 part of speech has its pos tag.
-    assert!(accents("一寸", "ちょいと").contains(&"1 int".to_owned()));
+    // An accent has the pos tags of its parts of speech, and 2 parts of speech with the same
+    // downstep share 1 accent.
+    assert_eq!(accents("一寸", "ちょいと"), ["0 adv", "1 adv int"]);
 }
