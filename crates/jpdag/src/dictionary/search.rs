@@ -3,7 +3,7 @@
 use rusqlite::params;
 use serde::Deserialize;
 
-use super::{CharacterLink, Dictionary, Error, sql_count};
+use super::{CharacterLink, Dictionary, Error, FuriganaPart, sql_count};
 use crate::kana;
 use crate::normalize::normalize_str;
 
@@ -30,6 +30,9 @@ pub struct WordSummary {
     /// The character, if the written form at position 1 is exactly 1 kanji and that kanji is not
     /// a mutant. The word then opens the page of that character.
     pub kanji: Option<char>,
+    /// The headword in parts, with the furigana of the first reading of its form. Empty if the
+    /// headword is a reading, or if there are no furigana.
+    pub furigana: Vec<FuriganaPart>,
 }
 
 /// Largest number of forms of a query that the search uses.
@@ -139,6 +142,7 @@ impl Dictionary {
         let Some(head) = self.head(id)? else {
             return Ok(None);
         };
+        let furigana = self.headword_furigana(id, &head)?;
         let headword = head.headword();
         let is_other_form = matched != headword && Some(matched) != head.reading.as_deref();
         Ok(Some(WordSummary {
@@ -147,6 +151,7 @@ impl Dictionary {
             matched_form: is_other_form.then(|| matched.to_owned()),
             gloss: self.rows::<String>(FIRST_GLOSSES, [id])?.join("; "),
             kanji: head.kanji.and_then(char::from_u32),
+            furigana,
             headword,
         }))
     }

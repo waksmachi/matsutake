@@ -154,6 +154,32 @@ impl Fixture {
         );
     }
 
+    /// Gives a kanji a KANJIDIC2 reading, with the number of words that use it.
+    fn reading(&self, character: char, position: u32, kind: &str, text: &str, words: u32) {
+        self.character(character);
+        self.execute(
+            "INSERT INTO character_reading VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![u32::from(character), position, kind, text, words],
+        );
+    }
+
+    fn meaning(&self, character: char, position: u32, text: &str) {
+        self.execute(
+            "INSERT INTO character_meaning VALUES (?1, ?2, ?3)",
+            params![u32::from(character), position, text],
+        );
+    }
+
+    /// Gives a written form and a reading furigana, each part as (start, length, kana).
+    fn furigana(&self, form_id: u32, reading_id: u32, parts: &[(u32, u32, &str)]) {
+        for (position, &(start, length, kana)) in (1..).zip(parts) {
+            self.execute(
+                "INSERT INTO furigana VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![form_id, reading_id, position, start, length, kana],
+            );
+        }
+    }
+
     fn mutant(&self, mutant: char, base: char) {
         self.character(mutant);
         self.character(base);
@@ -179,8 +205,13 @@ impl Fixture {
     }
 
     /// The word ちょっと, with the written forms 一寸 and 鳥渡 and the tag `uk`.
-    fn with_chotto(mut self) -> Fixture {
-        let word = self.word(1, &["一寸", "鳥渡"], &["ちょっと"], &["a little"]);
+    fn with_chotto(self) -> Fixture {
+        self.with_chotto_at(1)
+    }
+
+    /// The word ちょっと, with the id `id`.
+    fn with_chotto_at(mut self, id: u32) -> Fixture {
+        let word = self.word(id, &["一寸", "鳥渡"], &["ちょっと"], &["a little"]);
         self.usually_kana(&word);
         self
     }
@@ -218,6 +249,10 @@ fn tag(category: &str, name: &str) -> Tag {
 fn found(dictionary: &Dictionary, query: &str) -> Vec<u32> {
     let results = dictionary.search(query, 0, 10).unwrap();
     results.words.iter().map(|word| word.id).collect()
+}
+
+fn word_ids(words: &[WordSummary]) -> Vec<u32> {
+    words.iter().map(|word| word.id).collect()
 }
 
 fn page(dictionary: &Dictionary, character: char) -> Kanji {
@@ -289,6 +324,11 @@ fn search_matches_readings() {
             matched_form: None,
             gloss: "stoop".into(),
             kanji: None,
+            // No furigana rows: the whole reading over the whole form.
+            furigana: vec![FuriganaPart {
+                text: "猫背".into(),
+                kana: Some("ねこぜ".into()),
+            }],
         }]
     );
 }
@@ -462,6 +502,15 @@ fn word_keeps_every_part_in_order() {
         "UPDATE sense SET note = 'a note' WHERE id = ?1",
         [second_sense],
     );
+    // ごがく is 1, and 0 as a noun. The rows are out of order, and the query sorts them.
+    fixture.execute(
+        "INSERT INTO accent VALUES (101, ?1, 2, 0), (100, ?1, 1, 1)",
+        [word.readings[0]],
+    );
+    fixture.execute(
+        "INSERT INTO accent_tag SELECT 101, id FROM tag WHERE category = 'pos' AND name = 'n'",
+        [],
+    );
     fixture.execute(
         "INSERT INTO sense_written_form VALUES (?1, ?2)",
         [second_sense, word.written_forms[1]],
@@ -479,11 +528,20 @@ fn word_keeps_every_part_in_order() {
                 text: "語学".into(),
                 kanji: vec![kanji('語'), kanji('学')],
                 tags: vec![],
+                readings: vec![FormReading {
+                    text: "ごがく".into(),
+                    // No furigana rows: the whole reading over the whole form.
+                    furigana: vec![FuriganaPart {
+                        text: "語学".into(),
+                        kana: Some("ごがく".into()),
+                    }],
+                }],
             },
             WrittenForm {
                 text: "攵語".into(),
                 kanji: vec![mutant('攵', '攴'), kanji('語')],
                 tags: vec![tag("ke_inf", "rK")],
+                readings: vec![],
             },
         ],
         readings: vec![
@@ -492,12 +550,25 @@ fn word_keeps_every_part_in_order() {
                 no_kanji: false,
                 restricted_to: vec!["語学".into()],
                 tags: vec![],
+                morae: vec!["ご".into(), "が".into(), "く".into()],
+                accents: vec![
+                    Accent {
+                        downstep: 1,
+                        parts_of_speech: vec![],
+                    },
+                    Accent {
+                        downstep: 0,
+                        parts_of_speech: vec![tag("pos", "n")],
+                    },
+                ],
             },
             Reading {
                 text: "ゴガク".into(),
                 no_kanji: true,
                 restricted_to: vec![],
                 tags: vec![tag("re_inf", "ik")],
+                morae: vec!["ゴ".into(), "ガ".into(), "ク".into()],
+                accents: vec![],
             },
         ],
         senses: vec![
@@ -627,14 +698,17 @@ fn word_of_a_mutant_opens_a_word_page() {
 fn kanji_words_use_the_first_form() {
     let dictionary = Fixture::new().with_chotto().open();
     let bird = page(&dictionary, '鳥');
-    assert!(bird.words.is_empty());
+    assert_eq!(bird.words, KanjiWords::default());
     assert_eq!(bird.word_count, 0);
 
     // The summary names the written form that holds the kanji, because the headword does not.
     let measure = page(&dictionary, '寸');
     assert_eq!(measure.word_count, 1);
-    assert_eq!(measure.words[0].headword, "ちょっと");
-    assert_eq!(measure.words[0].matched_form.as_deref(), Some("一寸"));
+    assert_eq!(measure.words.ending[0].headword, "ちょっと");
+    assert_eq!(
+        measure.words.ending[0].matched_form.as_deref(),
+        Some("一寸")
+    );
 }
 
 #[test]
@@ -644,9 +718,39 @@ fn kanji_word_count_exceeds_the_limit() {
     fixture.word(2, &["語源"], &["ごげん"], &["origin of a word"]);
     fixture.word(3, &["語学"], &["ごがく"], &["study of languages"]);
     let page = fixture.open().character('語', 2).unwrap().unwrap();
-    let ids: Vec<u32> = page.words.iter().map(|word| word.id).collect();
-    assert_eq!(ids, [2, 3]);
+    assert_eq!(word_ids(&page.words.starting), [2, 3]);
     assert_eq!(page.word_count, 3);
+}
+
+#[test]
+fn kanji_words_are_split_by_the_position_of_the_kanji() {
+    let mut fixture = Fixture::new();
+    fixture.word(
+        1,
+        &["公私混同"],
+        &["こうしこんどう"],
+        &["mixing work and private matters"],
+    );
+    fixture.word(2, &["公私"], &["こうし"], &["public and private"]);
+    fixture.word(3, &["私立"], &["しりつ"], &["private"]);
+    fixture.word(4, &["私鉄"], &["してつ"], &["private railway"]);
+    fixture.word(5, &["私私"], &["しし"], &["an invented word"]);
+    let words = page(&fixture.open(), '私').words;
+    assert_eq!(word_ids(&words.starting), [3, 4, 5]);
+    assert_eq!(word_ids(&words.ending), [2]);
+    assert_eq!(word_ids(&words.inside), [1]);
+}
+
+#[test]
+fn kanji_words_do_not_count_kana_in_their_length() {
+    let mut fixture = Fixture::new();
+    fixture.word(1, &["鳥打ち"], &["とりうち"], &["bird hunting"]);
+    fixture.word(2, &["鳥目"], &["とりめ"], &["night blindness"]);
+    fixture.word(3, &["鳥かご"], &["とりかご"], &["birdcage"]);
+    fixture.word(4, &["鳥っぽい"], &["とりっぽい"], &["birdlike"]);
+    let words = page(&fixture.open(), '鳥').words;
+    // 1 character that is not kana (鳥かご, then the longer 鳥っぽい), then 2 (鳥目, then 鳥打ち).
+    assert_eq!(word_ids(&words.starting), [3, 4, 2, 1]);
 }
 
 #[test]
@@ -667,7 +771,7 @@ fn kanji_includes_its_word_entries() {
     );
     assert_eq!(page.entries[0].senses[0].glosses.len(), 2);
     assert_eq!(
-        page.words,
+        page.words.starting,
         [WordSummary {
             id: 1,
             headword: "私立".into(),
@@ -675,6 +779,11 @@ fn kanji_includes_its_word_entries() {
             matched_form: None,
             gloss: "private".into(),
             kanji: None,
+            // No furigana rows: the whole reading over the whole form.
+            furigana: vec![FuriganaPart {
+                text: "私立".into(),
+                kana: Some("しりつ".into()),
+            }],
         }]
     );
     assert_eq!(page.word_count, 1);
@@ -688,4 +797,181 @@ fn character_normalizes_its_input() {
     let page = page(&fixture.open(), '\u{2F1D}');
     assert_eq!(page.character, '口');
     assert_eq!(page.entries.len(), 1);
+}
+
+#[test]
+fn kanji_has_its_readings_and_meanings() {
+    let fixture = Fixture::new();
+    fixture.reading('生', 1, "on", "セイ", 1396);
+    fixture.reading('生', 2, "on", "ショウ", 205);
+    fixture.reading('生', 3, "kun", "い.きる", 63);
+    fixture.reading('生', 4, "kun", "なま", 138);
+    fixture.reading('生', 5, "on", "ソウ", 0);
+    fixture.meaning('生', 1, "life");
+    fixture.meaning('生', 2, "genuine");
+    let page = page(&fixture.open(), '生');
+    let readings: Vec<(ReadingKind, &str, u32)> = page
+        .readings
+        .iter()
+        .map(|r| (r.kind, r.text.as_str(), r.word_count))
+        .collect();
+    assert_eq!(
+        readings,
+        [
+            (ReadingKind::On, "セイ", 1396),
+            (ReadingKind::On, "ショウ", 205),
+            (ReadingKind::On, "ソウ", 0),
+            (ReadingKind::Kun, "なま", 138),
+            (ReadingKind::Kun, "い.きる", 63),
+        ]
+    );
+    assert_eq!(page.meanings, ["life", "genuine"]);
+}
+
+#[test]
+fn word_hides_search_only_forms() {
+    let mut fixture = Fixture::new();
+    let word = fixture.word(1, &["私", "厶"], &["わたし", "ワタシ"], &["I"]);
+    fixture.tag("written_form", word.written_forms[1], "ke_inf", "sK");
+    fixture.tag("reading", word.readings[1], "re_inf", "sk");
+    fixture.execute(
+        "INSERT INTO sense_written_form VALUES (?1, ?2)",
+        [word.sense, word.written_forms[1]],
+    );
+    let dictionary = fixture.open();
+
+    let entry = dictionary.word(1).unwrap().unwrap();
+    let forms: Vec<&str> = entry
+        .written_forms
+        .iter()
+        .map(|f| f.text.as_str())
+        .collect();
+    let readings: Vec<&str> = entry.readings.iter().map(|r| r.text.as_str()).collect();
+    assert_eq!(forms, ["私"]);
+    assert_eq!(readings, ["わたし"]);
+    assert!(entry.senses[0].written_forms.is_empty());
+    // The search still finds the word by the search-only reading.
+    assert_eq!(found(&dictionary, "ワタシ"), [1]);
+}
+
+#[test]
+fn written_forms_name_their_readings() {
+    let mut fixture = Fixture::new();
+    let word = fixture.word(
+        1,
+        &["土塊", "土くれ", "土䰟"],
+        &["つちくれ", "どかい", "ツチクレ", "どこん"],
+        &["clod"],
+    );
+    let restrict = |fixture: &Fixture, reading: usize, form: usize| {
+        fixture.execute(
+            "INSERT INTO reading_restriction VALUES (?1, ?2)",
+            [word.readings[reading], word.written_forms[form]],
+        );
+    };
+    restrict(&fixture, 1, 0);
+    // どこん reads only a search-only form, so it reads no form of the entry.
+    fixture.tag("written_form", word.written_forms[2], "ke_inf", "sK");
+    restrict(&fixture, 3, 2);
+    fixture.execute(
+        "UPDATE reading SET no_kanji = 1 WHERE id = ?1",
+        [word.readings[2]],
+    );
+
+    let entry = fixture.open().word(1).unwrap().unwrap();
+    let pairs: Vec<(&str, Vec<&str>)> = entry
+        .written_forms
+        .iter()
+        .map(|f| {
+            (
+                f.text.as_str(),
+                f.readings.iter().map(|r| r.text.as_str()).collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            ("土塊", vec!["つちくれ", "どかい"]),
+            ("土くれ", vec!["つちくれ"]),
+        ]
+    );
+}
+
+fn parts(furigana: &[FuriganaPart]) -> Vec<(&str, Option<&str>)> {
+    furigana
+        .iter()
+        .map(|part| (part.text.as_str(), part.kana.as_deref()))
+        .collect()
+}
+
+#[test]
+fn each_reading_of_a_form_has_its_furigana() {
+    let mut fixture = Fixture::new();
+    let word = fixture.word(1, &["土塊", "土くれ"], &["つちくれ", "どかい"], &["clod"]);
+    fixture.execute(
+        "INSERT INTO reading_restriction VALUES (?1, ?2)",
+        [word.readings[1], word.written_forms[0]],
+    );
+    let (dokai, tsuchikure) = (word.written_forms[0], word.written_forms[1]);
+    fixture.furigana(dokai, word.readings[0], &[(0, 2, "つちくれ")]);
+    fixture.furigana(dokai, word.readings[1], &[(0, 1, "ど"), (1, 1, "かい")]);
+    fixture.furigana(tsuchikure, word.readings[0], &[(0, 1, "つち")]);
+    let entry = fixture.open().word(1).unwrap().unwrap();
+    let readings = &entry.written_forms[0].readings;
+    // A range of characters is 1 part.
+    assert_eq!(parts(&readings[0].furigana), [("土塊", Some("つちくれ"))]);
+    assert_eq!(
+        parts(&readings[1].furigana),
+        [("土", Some("ど")), ("塊", Some("かい"))]
+    );
+    assert_eq!(
+        parts(&entry.written_forms[1].readings[0].furigana),
+        [("土", Some("つち")), ("くれ", None)]
+    );
+}
+
+#[test]
+fn form_with_kanji_and_no_furigana_has_the_reading_as_1_part() {
+    let mut fixture = Fixture::new();
+    fixture.word(1, &["逸物"], &["いちもつ"], &["gem"]);
+    let dictionary = fixture.open();
+    let entry = dictionary.word(1).unwrap().unwrap();
+    assert_eq!(
+        parts(&entry.written_forms[0].readings[0].furigana),
+        [("逸物", Some("いちもつ"))]
+    );
+    let results = dictionary.search("逸物", 0, 10).unwrap();
+    assert_eq!(
+        parts(&results.words[0].furigana),
+        [("逸物", Some("いちもつ"))]
+    );
+}
+
+#[test]
+fn form_with_no_furigana_has_no_parts() {
+    let mut fixture = Fixture::new();
+    fixture.word(1, &["ＡＳＣＩＩ"], &["アスキー"], &["ASCII"]);
+    let entry = fixture.open().word(1).unwrap().unwrap();
+    assert!(entry.written_forms[0].readings[0].furigana.is_empty());
+}
+
+#[test]
+fn search_gives_the_furigana_of_the_headword() {
+    let mut fixture = Fixture::new();
+    let word = fixture.word(1, &["語学"], &["ごがく"], &["linguistics"]);
+    fixture.furigana(
+        word.written_forms[0],
+        word.readings[0],
+        &[(0, 1, "ご"), (1, 1, "がく")],
+    );
+    let dictionary = fixture.with_chotto_at(2).open();
+    let results = dictionary.search("語学", 0, 10).unwrap();
+    assert_eq!(
+        parts(&results.words[0].furigana),
+        [("語", Some("ご")), ("学", Some("がく"))]
+    );
+    // A headword that is a reading has no furigana.
+    let results = dictionary.search("ちょっと", 0, 10).unwrap();
+    assert!(results.words[0].furigana.is_empty());
 }

@@ -3,9 +3,11 @@
 
 use std::path::Path;
 
+use rusqlite::functions::FunctionFlags;
 use rusqlite::{Connection, OpenFlags, Params};
 use serde::de::DeserializeOwned;
 
+use crate::kana::length_without_kana;
 use crate::schema::SCHEMA_VERSION;
 
 mod character;
@@ -14,9 +16,9 @@ mod search;
 mod tests;
 mod word;
 
-pub use character::{CharacterLink, Form, Kanji};
+pub use character::{CharacterLink, CharacterReading, Form, Kanji, KanjiWords, ReadingKind};
 pub use search::{SearchResults, WordSummary};
-pub use word::{Gloss, Reading, Sense, Tag, Word, WrittenForm};
+pub use word::{Accent, FormReading, FuriganaPart, Gloss, Reading, Sense, Tag, Word, WrittenForm};
 
 /// Number of prepared statements that the connection keeps: more than the queries of this module.
 const STATEMENT_CACHE: usize = 32;
@@ -50,6 +52,12 @@ impl Dictionary {
             });
         }
         conn.set_prepared_statement_cache_capacity(STATEMENT_CACHE);
+        let flags = FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC;
+        // The order of the words of a kanji counts the characters that are not kana.
+        conn.create_scalar_function("length_without_kana", 1, flags, |context| {
+            let text: String = context.get(0)?;
+            Ok(length_without_kana(&text) as i64)
+        })?;
         Ok(Dictionary { conn })
     }
 

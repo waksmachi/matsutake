@@ -87,6 +87,17 @@ pub fn to_katakana(text: &str) -> String {
         .collect()
 }
 
+/// Whether a character is kana: hiragana, katakana, or ー. The iteration marks ゝ, ゞ, ヽ, and ヾ
+/// are kana too. ・ is not.
+pub fn is_kana(c: char) -> bool {
+    matches!(c, 'ぁ'..='ゖ' | 'ゝ' | 'ゞ' | 'ァ'..='ヺ' | 'ー' | 'ヽ' | 'ヾ')
+}
+
+/// Gives the number of characters of a text that are not kana: 1 for 鳥かご, and 2 for 鳥打ち.
+pub fn length_without_kana(text: &str) -> usize {
+    text.chars().filter(|&c| !is_kana(c)).count()
+}
+
 /// Splits a reading into its morae, the units of its rhythm and its pitch. A small ゃ, ゅ, ょ, ぁ,
 /// ぃ, ぅ, ぇ, ぉ, or ゎ (or its katakana) joins the kana before it: きょう is きょ and う. A small っ,
 /// ん, and ー are each a mora.
@@ -214,6 +225,15 @@ mod tests {
         assert_eq!(hiragana("食べmasu"), "食べます");
         // The rows of the table for punctuation are not used.
         assert_eq!(hiragana("a.i"), "あ.い");
+    }
+
+    #[test]
+    fn kana_do_not_count_in_the_length() {
+        assert_eq!(length_without_kana("鳥かご"), 1);
+        assert_eq!(length_without_kana("鳥打ち"), 2);
+        assert_eq!(length_without_kana("Ｔシャツ"), 1);
+        assert_eq!(length_without_kana("コーヒー"), 0);
+        assert_eq!(length_without_kana("人々"), 2);
     }
 
     #[test]
