@@ -1,0 +1,40 @@
+name: matsutake
+description: "Matsutake: a Japanese dictionary of words and kanji"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_rust_bridge: 2.13.0
+  jpdag_ffi:
+    path: rust_builder
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  sqlite3: ^3.1.0
+
+flutter:
+  uses-material-design: true
+
+  # The directory also holds build-report.txt of ingest, so each asset is listed by itself.
+  assets:
+    - assets/content.db
+    - assets/fonts/NotoSansCJKjp-LICENSE.txt
+    - assets/fonts/fallback-LICENSE.txt
+
+  fonts:
+    - family: Noto Sans CJK JP
+      fonts:
+        - asset: assets/fonts/NotoSansCJKjp-Regular.otf
+        - asset: assets/fonts/NotoSansCJKjp-Bold.otf
+          weight: 700
+    - family: Matsutake Fallback
+      fonts:
+        - asset: assets/fonts/fallback.ttf

@@ -2,8 +2,9 @@
 
 ## 1. Summary
 
-`app/` is a Flutter frontend for the dictionary component of `jpdag`: a search bar that finds words
-and characters, and a page for each word and kanji that links to its kanji and components.
+`app/` is a Flutter frontend for the dictionary component of `jpdag`: a search screen that finds
+words and characters, and a page for each word and kanji that links to its kanji and components.
+The app has 1 layout for desktop and mobile: a header, then tabs, as Pleco shows an entry.
 
 ## 2. Scope
 
@@ -38,7 +39,8 @@ content.db (read-only)
 ## 4. `jpdag-ffi`
 
 `crates/jpdag-ffi` is a `cdylib` and `staticlib` crate with 1 module, `api`, that
-`flutter_rust_bridge` reads:
+`flutter_rust_bridge` reads. Its package name is `jpdag_ffi`, with no hyphen, because Cargokit makes
+the file name of the library from the package name:
 
 | Function | Calls |
 | --- | --- |
@@ -71,37 +73,39 @@ app/
   assets/content.db           the output of ingest, which git ignores
   assets/fonts/               the 2 fonts and their licences (section 5.4)
   tool/subset_fallback.sh     makes the fallback font from Plangothic P1
-  lib/main.dart               opens the dictionary and shows the layout
+  lib/main.dart               opens the dictionary and shows the search screen
   lib/src/dictionary.dart     the first-launch copy of content.db
-  lib/src/layout.dart         the search bar, the dropdown, and the content area with its history
-  lib/src/search_dropdown.dart
-  lib/src/word_page.dart
+  lib/src/search_screen.dart  the search screen, and the search session that its instances share
+  lib/src/word_page.dart      the word page, and the header and tabs of each page
   lib/src/kanji_page.dart
-  lib/src/character_chip.dart
+  lib/src/character_link.dart
   lib/src/rust/               the generated bindings
+  android/                    the Android runner
+  ios/                        the iOS runner
   linux/                      the Linux desktop runner
+  macos/                      the macOS desktop runner
 ```
 
 Dart packages: `flutter_rust_bridge`, `path_provider` (the directory for the copy of `content.db`),
 and the local `rust_builder` plugin. The app uses Flutter's own `Navigator` and `StatefulWidget`, not
 a state or routing package.
 
-### 5.2 Layout and pages
+### 5.2 Screens and pages
 
-**The layout** has 2 parts:
+The app has 2 kinds of screen: **the search screen**, and **a page** for a word or a kanji. The
+search screen is the first screen. A page goes on top of the screen that opens it, and the back
+arrow of a page walks back through the pages, to the search screen. A page uses the full width of
+the window.
 
-- **The search bar**, fixed at the top. A back button at its left goes back in the history of the
-  content area. The button is hidden when there is nothing to go back to.
-- **The content area** below it. It shows 1 page at a time: a start page with a short hint (the
-  user can type kanji, kana, or romaji), a word page, or a kanji page. It has its own
-  nested `Navigator`: each link pushes a page into that history, and the search bar stays in
-  place.
+**The search screen**
 
-**The search dropdown**
+The search field is at the top, and the results fill the screen below it. With no query, the
+screen shows a short hint: the user can type kanji, kana, or romaji.
 
-The dropdown opens under the search bar while the field has focus and the query is not empty. It
-floats over the content area, which stays visible around it. The dropdown scrolls, and its height is
-at most 60% of the window.
+The search screen keeps its search session while pages are open: the query, the results, and
+the selected row. A page has a search icon in its top bar, which goes back to the search screen,
+gives its field focus, and closes all pages. So the history of pages starts again with the next
+page that the user opens.
 
 *When the search runs*
 
@@ -116,6 +120,7 @@ at most 60% of the window.
   character and the label "character". A character row opens the page of the character. The row of
   a mutant has the label "form of 水", and opens the page of the base.
 - **Word rows** follow: the headword, the reading, and the gloss.
+  - A summary with `furigana` shows the headword with its furigana, and not the reading.
   - A summary with no `reading` shows the headword alone.
   - A summary with a `matched_form` shows it after the reading, for example "matches 鳥渡".
 - A word whose `WordSummary.kanji` is set, for example 私, opens the page of that character with
@@ -134,55 +139,116 @@ at most 60% of the window.
 *The keyboard*
 
 - When results arrive for a new query, the first row is selected.
-- The Up and Down keys move the selection, Enter opens the selected row, and Escape closes the
-  dropdown. A click outside the dropdown also closes it.
+- The Up and Down keys move the selection, and Enter opens the selected row. If the results of the
+  text are not yet in the list, Enter waits for them, so that it does not open a row of the query
+  before.
 - While an input method is composing, Enter belongs to the input method: it commits the text and
   does not open a row. The next Enter opens the selected row.
+- When the search field gets focus, the app selects the whole query.
 
 *After the user picks a row*
 
-- The row opens in the content area, the dropdown closes, and the field loses focus. The query
-  stays in the field.
-- When the field gets focus again, the app selects the whole query, and the dropdown opens again
-  with the same results at the same scroll position.
+- The page of the row opens, and the field loses focus. The query stays in the session.
+
+**A page**
+
+Each page has a top bar with the back arrow and the search icon. A kanji page then has a header and
+a row of tabs. The content of the selected tab fills the rest of the page, and scrolls by itself. A
+tab with nothing in it is hidden: a kanji that is not a word has no Dict tab, and a kanji in no
+other word has no Words tab. A page with no tab is the header alone.
 
 **Word page**
 
-- The headword is the title, with the reading below it.
-- **Written forms**: each form with its tags. Each kanji of the form is a character chip.
-- **Readings**: each reading with its tags, its restrictions ("only 一寸"), and a mark when it has no
-  written form.
-- **Senses**, numbered: the tags as small chips (the description is the tooltip), the glosses joined
-  with "; " (a `lit` gloss in quotes, an `expl` gloss in italics), the note, and the restrictions.
+The page has no header and no tabs: the written forms show the word. Under the top bar are the
+**readings** with their written forms, a line, then the **senses**, with no section headings.
+
+- The readings, in order, each on its own line. The written forms that a reading reads are on the
+  next line, indented by 1 em, in brackets, with ・ between 2 forms: つちくれ, then 【土塊・土くれ】
+  below it. A long list wraps, each line starts under the first form, and a line does not start
+  with ・ or 】. A reading of no form, such as トリ of 鳥, has no line of forms, and no note. The
+  brackets and ・ are in the colour of a divider (`outlineVariant`). The forms have no furigana.
+  Each kanji of a written form is a character link.
+- The pitch accent of each reading (`Reading.accents`), drawn on the reading itself: a line over
+  the morae of high pitch, and a short tick down after the mora where the pitch falls. The tick
+  is halfway between the ink of the 2 kana, not at the edge of their boxes, because a kana such as
+  ょ has more space on 1 side of its box. `tool/kana_ink.py` reads the edges of the ink of each
+  kana from Noto Sans CJK JP into `lib/src/kana_ink.dart`. A fall at the end of the reading is a
+  little after the ink of the last kana. はし as 箸
+  (1) has the line over は, and as 橋 (2) over し, each with a tick after it. With no fall (0), as
+  端, the line runs on past the last mora with no tick, because the pitch stays high on a particle.
+  So a reading with no fall looks different from a reading with no accent. The line is in the
+  colour of a divider (`outlineVariant`), as the brackets and the ・ of the written forms are.
+  - A reading with 2 or more accents shows the reading once for each, in order, with ・ between
+    them in the colour of a divider: ちょっと (1) ・ ちょっと (0). A line does not start with ・.
+  - An accent of some parts of speech has their `pos` tag names after it in small, light text,
+    with ", " between them, and their descriptions as the tooltip: ちょいと adv ・ ちょいと adv, int.
+  - A reading with no accent in `content.db` is plain text, with no note. Search rows and the
+    tooltips of the Words tab show no accent.
+- The tags of the readings and forms: a superscript number for each tag at the top right of the
+  reading or form (after the first accent of a reading), such as 鳥渡¹˒², and below the last line
+  of forms, a legend with the description of each number: "¹ rarely used kanji form". A number
+  stands for 1 tag wherever it is, and the numbers go in the order that the tags first appear.
+  The tooltip of a superscript gives its lines of the legend.
+- The senses, numbered. Each sense has its tags as small, low labels (the description is the
+  tooltip) on a row just above its glosses, so the glosses of all senses start in 1 column. A
+  label has no fill, a thin outline in the colour of a divider (`outlineVariant`), and sharp
+  corners. Then
+  the glosses joined with "; " (a `lit` gloss in quotes, an `expl` gloss in italics), the note, and
+  the restrictions. A part-of-speech tag shows only when it differs from the tags of the sense
+  before.
 
 **Kanji page**
 
-- **The header**: the character, large. Beside it, **Components**: character chips. None for a
-  character with no component data.
-- **Entries**: when the kanji is also a word, 1 row for each of its word entries.
-  - A collapsed row shows the reading at position 1 and the glosses of the first sense.
-  - A tap expands the row to the full entry, as on the word page, and a second tap collapses it.
-  - A kanji with 1 entry shows it expanded.
-  - When the page opens from a word row of the search, that entry is expanded and has a highlight,
-    and the page scrolls only as far as it must to show the entry. When the page opens from a
-    character row or a character link, the page opens at the top.
-- **Used in**: a grid of character chips. After it, 1 grid for each form of the kanji, with the
-  heading "as 氵": the kanji that use that mutant. A grid with no characters is hidden.
-- **Words**: the other words that contain the kanji, with "N more" when `word_count` is larger than
-  the list.
+- **The header**: the character, large. Beside it, the readings and the meanings:
+  - A line with the label "On" and the first 3 on readings, and a line with the label "Kun" and
+    the first 3 kun readings, each in the order of `Kanji.readings` (the readings of common words
+    first), with a `VerticalDivider` between 2
+    readings. A line with no reading is hidden.
+  - A kun reading shows its okurigana in a lighter colour, without the `.`, and keeps the `-` of a
+    prefix or a suffix.
+  - A line with the label "Components" and the components of the kanji, each a character link,
+    with a `VerticalDivider` between 2 components. A kanji with no component data has no line. The
+    labels are 1 column, so the 3 lines start at the same place.
+  - The first 5 meanings, with a `VerticalDivider` between 2 meanings. A long list
+    wraps between meanings, and a line does not start with a divider.
+- **Dict**: when the kanji is also a word, the entry of each word, 1 after the other, with a line
+  between them, the most frequent word first (方 as ほう, then かた). There is nothing to expand or
+  collapse.
+  - An entry shows its readings with their written forms, as the word page does, then all its
+    senses. Each kanji of a form is a character link. The kanji of the page, or a mutant of it,
+    does not open the page again: under the pointer it turns a muted colour (`outline`), and the
+    pointer stays an arrow.
+  - When the page opens from a word row of the search, the entry of that word has a highlight,
+    and the tab scrolls only as far as it must to show the entry.
+- **Words**: the other words that contain the kanji, as chips. A chip shows the written form that
+  contains the kanji. Its tooltip has the headword with its furigana (or with the reading after it,
+  for a headword with no furigana), then the gloss, and a tap opens the page of the word. The
+  sub-tabs "私…", "…私", and "…私…" hold the 3 lists of `KanjiWords`, each with its count. The page
+  asks for all words of the kanji, and the tab builds only the chips in view. The chips keep the
+  order of `KanjiWords`, in which kana do not count in the length of a word: 鳥かご comes with the
+  words of 1 kanji. Words of the same length come in order of frequency, so 鳥肌 and 鳥居 come
+  before rare words. Each run of words with the same whole length is 1 grid, whose columns fit the
+  words. A line in the colour of a divider separates the words of each number of kanji, and the
+  number is in a narrow column at the left of its words, small and light, level with their first
+  row.
 
-**Character chips**
+**Furigana**
 
-Each linked character on a page is a chip: the character alone, with no meaning and no reading. A
-tap opens the kanji page of the character.
+Furigana are the kana of each part of a headword, above that part, in the word rows of the search
+and the tooltips of the Words tab. They are half the size of the headword, and 10 points at least.
+A part with no kana, such as okurigana, has an empty line above it, so that all parts line up.
 
-A mutant has no page, so its chip is different in 2 ways:
+**Character links**
 
-- **Style**: a dashed outline, and the tooltip "form of 人".
-- **Target**: a tap opens the page of the base.
+A character link is a character in the text that opens its kanji page. It looks like the text
+around it, with no chip and no underline. Under the pointer, it turns vermilion and the pointer is
+a hand. A mutant has no page, so its link opens the page of its base, and its tooltip says "form of
+人".
 
-Each link pushes a new page into the content area, so the back button walks back through the chain,
-for example 語 → 吾 → 口.
+The app does not show `Kanji.used_in` and `Kanji.forms`: the kanji that use a kanji.
+
+Each link opens a new page on top of the page, so the back arrow walks back through the chain, for
+example 語 → 吾 → 口.
 
 ### 5.3 Shipping `content.db`
 
@@ -193,6 +259,23 @@ open the copy.
 A new app version with a new `content.db` needs a way to replace the old copy. This version does not
 have one, so a developer deletes the copy by hand.
 
+**Tooltips**
+
+A tooltip opens up and to the right of its source: its bottom left corner is just past the top
+right corner of the source (`tooltipAboveRight`). A tooltip below its source would cover the text
+under it, and catch the pointer as it moves down the page. Up and to the right, the pointer can
+leave the source in each direction, and reach the other sources around it. A tooltip with no room
+above goes below, and a tooltip with no room at the right moves left as far as it must. The
+tooltip of the search button keeps the default place, below the button, at the top of the page.
+
+**Colours**
+
+The theme comes from the seed #8D6E63, a brown, with 1 accent in its place: `primary` is
+vermilion, #B8341F on the light background and #FF6F4F on the dark one, each with a contrast of
+4.5:1 or more. The accent marks what is selected or live: the selected tab, the focused search
+field, and the highlighted entry. A character link turns `primary` under the pointer. Reference
+content, such as the pitch accent lines, is never vermilion, so it does not look like a link.
+
 ### 5.4 Fonts
 
 The app ships its own fonts and draws all text with them, so a kanji has its Japanese shape on
@@ -200,7 +283,12 @@ each device, and a rare component does not show as an empty box.
 
 - **Main font: Noto Sans CJK JP** (SIL Open Font License 1.1), in the weights Regular and Bold. It
   is the default `fontFamily` of the theme. It is not Noto Sans JP, the smaller font of that name
-  on Google Fonts.
+  on Google Fonts. The app ships a subset of each weight, about 4.5 MB in place of 17 MB:
+  `tool/subset_main_font.py` keeps the glyphs of each character of each text column of
+  `content.db`, of printable ASCII and Latin-1, of the hiragana, katakana, CJK punctuation, and
+  fullwidth forms that a query can hold, and of the strings of `lib/`. It keeps all layout
+  features. Its arguments are the full fonts, from `Sans/OTF/Japanese` of
+  github.com/notofonts/noto-cjk.
 - **Fallback font: `fallback.ttf`**, the first entry of `fontFamilyFallback`. It holds only the
   characters of `content.db` that the main font lacks. `tool/subset_fallback.sh` makes it from
   Plangothic P1 (SIL Open Font License 1.1) with `pyftsubset` of fontTools.
@@ -209,21 +297,28 @@ each device, and a rare component does not show as an empty box.
   adds the licences to the `LicenseRegistry` of Flutter.
 
 When the test of section 7 finds a character with no glyph, a developer runs
-`tool/subset_fallback.sh` with the characters that the test names.
+`tool/subset_main_font.py` with the full fonts, and then `tool/subset_fallback.sh` with the
+characters that the main font does not have. 15 characters of the glosses and forms are in no font
+of the app: Latin letters with marks, such as č and ṣ, and the symbols ϕ, ≒, and ⌀. The system
+draws them with a font of its own.
 
 ## 6. Build and run
 
 ```
 cargo run --release -p ingest -- --jmdict crates/ingest/sources/JMdict_e.gz \
   --kanjivg crates/ingest/sources/kanjivg-20250816.xml.gz \
-  --kanjidic crates/ingest/sources/kanjidic2.xml.gz --out app/assets
+  --kanjidic crates/ingest/sources/kanjidic2.xml.gz \
+  --furigana crates/ingest/sources/JmdictFurigana-2026-09-25.txt --out app/assets
 cd app
-fvm flutter run -d linux
+fvm flutter run -d linux    # or: -d macos, or an iOS or Android device
 ```
 
 `fvm` runs the Flutter version that `.fvmrc` pins. `flutter run` compiles `jpdag-ffi` through
-Cargokit. `ingest` also writes `build-report.txt` into `app/assets`, so `pubspec.yaml` lists
-`assets/content.db` alone, and `.gitignore` ignores the report.
+Cargokit. Cargokit builds with the `stable` toolchain of rustup, and installs it if it is missing.
+The macOS and iOS builds also need Xcode and CocoaPods, and the iOS build needs the iOS platform of
+Xcode. The Android build needs the Android SDK and NDK. `ingest` also writes `build-report.txt` into
+`app/assets`, so `pubspec.yaml` lists `assets/content.db` alone, and `.gitignore` ignores the
+report.
 
 To type Japanese into the Linux build under WSL, the WSL distribution needs an input method, for
 example fcitx5 with Mozc. Pasting works without one.
@@ -239,10 +334,10 @@ against the `content.db` in `app/assets/`:
 
 | Test | Condition |
 | --- | --- |
-| `each character has a glyph` | For each `character` row, the character map of Noto Sans CJK JP Regular or of `fallback.ttf` holds the code point. The Bold weight holds each code point that the Regular weight holds. The message of a failure lists each character with no glyph, with its code point. |
-| `fallback font has no unused glyph` | Each code point of `fallback.ttf` is a `character` row that Noto Sans CJK JP lacks |
+| `each character has a glyph` | For each `character` row, and each character of each text column, the character map of Noto Sans CJK JP Regular or of `fallback.ttf` holds the code point, unless it is 1 of the 15 characters that the system draws. The Bold weight holds each code point that the Regular weight holds. The message of a failure lists each character with no glyph, with its code point. |
+| `fallback font has no unused glyph` | Each code point of `fallback.ttf` is a character of `content.db` that Noto Sans CJK JP lacks |
 
-The test reads the `character` table with the Dart package `sqlite3`, a development dependency, and
+The test reads `content.db` with the Dart package `sqlite3`, a development dependency, and
 reads the character map (the `cmap` table) of each font file with a small reader in
 `app/test/support/`. If `app/assets/content.db` does not exist, the test is skipped with a message.
 The test compares code points, and does not draw text.

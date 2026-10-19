@@ -2,6 +2,7 @@
 /crates/ingest/sources/
 /crates/ingest/out/
 /app/assets/content.db
+/app/assets/build-report.txt
 /app/build/
 /app/.dart_tool/
 .fvm/

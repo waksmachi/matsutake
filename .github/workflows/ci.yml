@@ -89,3 +89,38 @@ jobs:
             crates/ingest/out/build-report.txt
             crates/ingest/out/content.db
           if-no-files-found: ignore
+
+  app:
+    name: App checks
+    needs: build-checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download content.db of the full build
+        uses: actions/download-artifact@v8
+        with:
+          name: content-db
+          path: app/assets
+      - name: Install the toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Install fvm
+        run: |
+          curl -fsSL https://fvm.app/install.sh | bash
+          echo "$HOME/fvm/bin" >> "$GITHUB_PATH"
+      - name: Install the Flutter of .fvmrc
+        run: fvm install
+      # The codegen must have the version of the flutter_rust_bridge crate and package.
+      - name: Install the bridge codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      - name: Check that the generated bindings are up to date
+        run: |
+          flutter_rust_bridge_codegen generate
+          git diff --exit-code -- lib/src/rust ../crates/jpdag-ffi/src/frb_generated.rs
+      - name: Run the analyzer
+        run: fvm flutter analyze
+      - name: Run the tests
+        run: fvm flutter test
