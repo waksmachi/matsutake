@@ -1,0 +1,19 @@
+[package]
+# Cargokit makes the file name of the library from this name, so it has no hyphen.
+name = "jpdag_ffi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+jpdag.workspace = true
+anyhow.workspace = true
+flutter_rust_bridge.workspace = true
+
+# `flutter_rust_bridge` uses this cfg in the code that its macros expand to.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
