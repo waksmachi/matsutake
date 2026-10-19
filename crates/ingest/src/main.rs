@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
+use jpdag::schema::COMMON_RANK;
 
 const USAGE: &str = "usage: ingest --jmdict JMdict_e.gz --kanjivg kanjivg-YYYYMMDD.xml.gz \
 --kanjidic kanjidic2.xml.gz --furigana JmdictFurigana-YYYY-MM-DD.txt \
@@ -154,12 +155,19 @@ fn run(args: &Args) -> Result<String> {
     let mut frequency = frequency::read(&args.frequency, &entries)?;
 
     // Stage 10.
+    let word_ranks = frequency.word_ranks(&entries);
+    let is_common = |word_id| word_ranks.get(&word_id).is_some_and(|&r| r <= COMMON_RANK);
     let character_readings = kanjidic
         .reading_rows()
         .into_iter()
         .map(|(id, position, kind, text)| {
-            let count = char::from_u32(id).map_or(0, |c| furigana.word_count(c, position));
-            (id, position, kind, text, count)
+            let (count, common) = char::from_u32(id).map_or((0, 0), |c| {
+                (
+                    furigana.word_count(c, position),
+                    furigana.common_word_count(c, position, is_common),
+                )
+            });
+            (id, position, kind, text, count, common)
         })
         .collect();
     let pair = |&(a, b): &(char, char)| (a as u32, b as u32);

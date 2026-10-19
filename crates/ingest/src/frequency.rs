@@ -9,6 +9,7 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
+use crate::jmdict::Category;
 use crate::words::EntryRows;
 
 /// The mark of Jiten on the rank of a word written in kana.
@@ -32,6 +33,82 @@ pub struct Frequency {
     pub form_rows: Vec<(u32, u32)>,
     /// `reading_frequency` rows, each as (reading_id, rank).
     pub reading_rows: Vec<(u32, u32)>,
+}
+
+impl Frequency {
+    /// The best rank of each word with a rank: of the word in 1 of its written forms, or in kana.
+    /// A rank in kana counts for a word that JMdict writes in kana (a word with no written form,
+    /// or a word whose first sense has the tag `uk`), and for a reading that no other word has.
+    /// Jiten counts a reading in kana for the words of other words with the same sound, as
+    /// `jpdag::dictionary` says.
+    pub fn word_ranks(&self, entries: &EntryRows) -> HashMap<u32, u32> {
+        let in_kana = words_in_kana(entries);
+        let mut words_of: HashMap<&str, HashSet<u32>> = HashMap::new();
+        for reading in &entries.readings {
+            words_of
+                .entry(&reading.text)
+                .or_default()
+                .insert(reading.word_id);
+        }
+        let form_words: HashMap<u32, u32> = entries
+            .written_forms
+            .iter()
+            .map(|f| (f.id, f.word_id))
+            .collect();
+        let reading_words: HashMap<u32, u32> = entries
+            .readings
+            .iter()
+            .filter(|r| in_kana.contains(&r.word_id) || words_of[r.text.as_str()].len() == 1)
+            .map(|r| (r.id, r.word_id))
+            .collect();
+        let forms = self
+            .form_rows
+            .iter()
+            .map(|&(id, rank)| (form_words.get(&id), rank));
+        let readings = self
+            .reading_rows
+            .iter()
+            .map(|&(id, rank)| (reading_words.get(&id), rank));
+        let mut ranks = HashMap::new();
+        for (word_id, rank) in forms.chain(readings) {
+            if let Some(&word_id) = word_id {
+                keep_best(&mut ranks, word_id, rank);
+            }
+        }
+        ranks
+    }
+}
+
+/// The words that JMdict writes in kana: the words with no written form, and the words whose first
+/// sense has the tag `uk`.
+fn words_in_kana(entries: &EntryRows) -> HashSet<u32> {
+    let uk: HashSet<u32> = entries
+        .tags
+        .iter()
+        .filter(|tag| tag.category == Category::Misc && tag.name == "uk")
+        .map(|tag| tag.id)
+        .collect();
+    let first_senses: HashMap<u32, u32> = entries
+        .senses
+        .iter()
+        .filter(|sense| sense.position == 1)
+        .map(|sense| (sense.id, sense.word_id))
+        .collect();
+    let with_forms: HashSet<u32> = entries.written_forms.iter().map(|f| f.word_id).collect();
+    let mut words: HashSet<u32> = entries
+        .words
+        .iter()
+        .copied()
+        .filter(|word| !with_forms.contains(word))
+        .collect();
+    words.extend(
+        entries
+            .sense_tags
+            .iter()
+            .filter(|(_, tag_id)| uk.contains(tag_id))
+            .filter_map(|(sense_id, _)| first_senses.get(sense_id)),
+    );
+    words
 }
 
 /// The `index.json` of a Yomitan dictionary.
@@ -295,7 +372,7 @@ mod tests {
     use std::io::{Cursor, Write};
 
     use super::*;
-    use crate::words::{ReadingRow, WrittenFormRow};
+    use crate::words::{ReadingRow, SenseRow, TagRow, WrittenFormRow};
 
     const INDEX: &str = r#"{"title":"Jiten (Drama)","revision":"Jiten (Drama) 26-10-09"}"#;
 
@@ -458,6 +535,47 @@ mod tests {
         );
         assert_eq!(frequency.entries, 2);
         assert_eq!(frequency.entries_without_word, 2);
+    }
+
+    #[test]
+    fn word_rank_is_the_best_rank_of_its_forms_and_readings() {
+        let mut words = entries(&[
+            (1, &["一寸"], &["ちょっと"]),
+            (2, &["休み"], &["やすみ"]),
+            (3, &["慣れる"], &["なれる"]),
+            (4, &["馴れる"], &["なれる"]),
+            (5, &["綺麗"], &["きれい"]),
+        ]);
+        // 一寸 is usually written in kana: the first sense of word 1 has the tag uk.
+        words.senses.push(SenseRow {
+            id: 1,
+            word_id: 1,
+            position: 1,
+            note: None,
+        });
+        words.tags.push(TagRow {
+            id: 1,
+            category: Category::Misc,
+            name: "uk".into(),
+            description: None,
+        });
+        words.sense_tags.push((1, 1));
+        let frequency = run(
+            r#"[["一寸","freq",{"reading":"ちょっと","frequency":{"value":47988,"displayValue":"47988"}}],
+                ["一寸","freq",{"reading":"ちょっと","frequency":{"value":46,"displayValue":"46㋕"}}],
+                ["休み","freq",{"reading":"やすみ","frequency":{"value":80,"displayValue":"80"}}],
+                ["慣れる","freq",{"reading":"なれる","frequency":{"value":948,"displayValue":"948"}}],
+                ["慣れる","freq",{"reading":"なれる","frequency":{"value":402,"displayValue":"402㋕"}}],
+                ["綺麗","freq",{"reading":"きれい","frequency":{"value":7364,"displayValue":"7364"}}],
+                ["綺麗","freq",{"reading":"きれい","frequency":{"value":675,"displayValue":"675㋕"}}]]"#,
+            &words,
+        );
+        // The kana rank of 慣れる does not count: its sense has no tag uk, and 馴れる has its
+        // reading. No other word reads きれい, so the kana rank of 綺麗 counts.
+        assert_eq!(
+            frequency.word_ranks(&words),
+            HashMap::from([(1, 46), (2, 80), (3, 948), (5, 675)])
+        );
     }
 
     #[test]

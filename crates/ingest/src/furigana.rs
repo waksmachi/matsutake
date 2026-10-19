@@ -43,6 +43,19 @@ impl Furigana {
             .map_or(0, |words| words.len() as u32)
     }
 
+    /// Number of words that read `character` with its reading at `position`, and that `is_common`
+    /// accepts.
+    pub fn common_word_count(
+        &self,
+        character: char,
+        position: u32,
+        is_common: impl Fn(u32) -> bool,
+    ) -> u32 {
+        self.words.get(&(character, position)).map_or(0, |words| {
+            words.iter().filter(|&&w| is_common(w)).count() as u32
+        })
+    }
+
     /// Number of readings that 1 or more words use.
     pub fn readings_in_use(&self) -> usize {
         self.words.len()
@@ -354,6 +367,18 @@ mod tests {
         assert_eq!(furigana.lines, 3);
         assert_eq!(furigana.word_count('語', 1), 2);
         assert_eq!(furigana.word_count('語', 2), 1);
+    }
+
+    #[test]
+    fn common_words_of_a_reading_are_counted() {
+        let kanjidic = kanjidic(&[('語', &[(On, "ゴ")])]);
+        let furigana = run(
+            "語学|ごがく|0:ご;1:がく\n英語|えいご|0:えい;1:ご\n",
+            &[(1, "語学", "ごがく"), (2, "英語", "えいご")],
+            &kanjidic,
+        );
+        assert_eq!(furigana.common_word_count('語', 1, |word| word == 2), 1);
+        assert_eq!(furigana.common_word_count('語', 1, |_| false), 0);
     }
 
     #[test]

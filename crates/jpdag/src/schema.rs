@@ -1,7 +1,12 @@
 //! Schema of `content.db`.
 
 /// Value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
-pub const SCHEMA_VERSION: i32 = 6;
+pub const SCHEMA_VERSION: i32 = 7;
+
+/// The last frequency rank that orders words. Many words past it share a rank, because they occur
+/// a few times each in the dramas of Jiten, so their ranks are noise: lists treat them as 1 band of
+/// rare words, after the words up to this rank and before the words with no rank.
+pub const COMMON_RANK: u32 = 20_000;
 
 /// Tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
 pub const CREATE_TABLES: &str = "
@@ -26,6 +31,8 @@ CREATE TABLE character_reading (
   type         TEXT NOT NULL CHECK (type IN ('on', 'kun')),
   text         TEXT NOT NULL,
   word_count   INTEGER NOT NULL,                            -- words that use the reading
+  common_word_count INTEGER NOT NULL,                       -- of those, the words with a rank
+                                                            -- up to COMMON_RANK
   PRIMARY KEY (character_id, position)
 ) STRICT, WITHOUT ROWID;
 

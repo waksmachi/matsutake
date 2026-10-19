@@ -154,12 +154,36 @@ impl Fixture {
         );
     }
 
-    /// Gives a kanji a KANJIDIC2 reading, with the number of words that use it.
-    fn reading(&self, character: char, position: u32, kind: &str, text: &str, words: u32) {
+    /// Gives a kanji a KANJIDIC2 reading, with the number of words that use it, and of the common
+    /// words.
+    fn reading(&self, character: char, position: u32, kind: &str, text: &str, words: [u32; 2]) {
         self.character(character);
         self.execute(
-            "INSERT INTO character_reading VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![u32::from(character), position, kind, text, words],
+            "INSERT INTO character_reading VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                u32::from(character),
+                position,
+                kind,
+                text,
+                words[0],
+                words[1]
+            ],
+        );
+    }
+
+    /// Gives a written form the frequency rank of its word in that form.
+    fn form_rank(&self, written_form_id: u32, rank: u32) {
+        self.execute(
+            "INSERT INTO written_form_frequency VALUES (?1, ?2)",
+            [written_form_id, rank],
+        );
+    }
+
+    /// Gives a reading the frequency rank of its word in kana.
+    fn kana_rank(&self, reading_id: u32, rank: u32) {
+        self.execute(
+            "INSERT INTO reading_frequency VALUES (?1, ?2)",
+            [reading_id, rank],
         );
     }
 
@@ -802,11 +826,12 @@ fn character_normalizes_its_input() {
 #[test]
 fn kanji_has_its_readings_and_meanings() {
     let fixture = Fixture::new();
-    fixture.reading('生', 1, "on", "セイ", 1396);
-    fixture.reading('生', 2, "on", "ショウ", 205);
-    fixture.reading('生', 3, "kun", "い.きる", 63);
-    fixture.reading('生', 4, "kun", "なま", 138);
-    fixture.reading('生', 5, "on", "ソウ", 0);
+    // More common words use い.きる than なま, though more words in all use なま.
+    fixture.reading('生', 1, "on", "セイ", [1396, 300]);
+    fixture.reading('生', 2, "on", "ショウ", [205, 90]);
+    fixture.reading('生', 3, "kun", "い.きる", [63, 40]);
+    fixture.reading('生', 4, "kun", "なま", [138, 25]);
+    fixture.reading('生', 5, "on", "ソウ", [0, 0]);
     fixture.meaning('生', 1, "life");
     fixture.meaning('生', 2, "genuine");
     let page = page(&fixture.open(), '生');
@@ -821,8 +846,8 @@ fn kanji_has_its_readings_and_meanings() {
             (ReadingKind::On, "セイ", 1396),
             (ReadingKind::On, "ショウ", 205),
             (ReadingKind::On, "ソウ", 0),
-            (ReadingKind::Kun, "なま", 138),
             (ReadingKind::Kun, "い.きる", 63),
+            (ReadingKind::Kun, "なま", 138),
         ]
     );
     assert_eq!(page.meanings, ["life", "genuine"]);
@@ -974,4 +999,115 @@ fn search_gives_the_furigana_of_the_headword() {
     // A headword that is a reading has no furigana.
     let results = dictionary.search("ちょっと", 0, 10).unwrap();
     assert!(results.words[0].furigana.is_empty());
+}
+
+#[test]
+fn search_orders_ties_by_frequency() {
+    let mut fixture = Fixture::new();
+    let edge = fixture.word(1, &["端"], &["はし"], &["edge"]);
+    let bridge = fixture.word(2, &["橋"], &["はし"], &["bridge"]);
+    fixture.word(3, &["嘴"], &["はし"], &["beak"]);
+    let chopsticks = fixture.word(4, &["箸"], &["はし"], &["chopsticks"]);
+    let rare = fixture.word(5, &["梯"], &["はし"], &["ladder"]);
+    let rarer = fixture.word(6, &["階"], &["はし"], &["stairs"]);
+    fixture.form_rank(edge.written_forms[0], 6946);
+    fixture.form_rank(bridge.written_forms[0], 3285);
+    fixture.form_rank(chopsticks.written_forms[0], 4834);
+    // Past COMMON_RANK, ranks are 1 band, so the word id decides.
+    fixture.form_rank(rare.written_forms[0], 90000);
+    fixture.form_rank(rarer.written_forms[0], 25000);
+    // The word with no rank comes last.
+    assert_eq!(found(&fixture.open(), "はし"), [2, 4, 1, 5, 6, 3]);
+}
+
+#[test]
+fn kanji_entries_come_in_order_of_frequency() {
+    let mut fixture = Fixture::new();
+    let person = fixture.word(1, &["方"], &["かた"], &["person"]);
+    let direction = fixture.word(2, &["方"], &["ほう"], &["direction"]);
+    fixture.word(3, &["方"], &["がた"], &["plural suffix"]);
+    fixture.form_rank(person.written_forms[0], 292);
+    fixture.form_rank(direction.written_forms[0], 206);
+    let ids: Vec<u32> = page(&fixture.open(), '方')
+        .entries
+        .iter()
+        .map(|word| word.id)
+        .collect();
+    assert_eq!(ids, [2, 1, 3]);
+}
+
+#[test]
+fn kanji_words_keep_the_most_frequent_and_order_them_in_a_length() {
+    let mut fixture = Fixture::new();
+    fixture.word(1, &["鳥目"], &["とりめ"], &["night blindness"]);
+    let gate = fixture.word(2, &["鳥居"], &["とりい"], &["torii"]);
+    let goosebumps = fixture.word(3, &["鳥肌"], &["とりはだ"], &["goosebumps"]);
+    let cage = fixture.word(4, &["鳥かご"], &["とりかご"], &["birdcage"]);
+    fixture.form_rank(gate.written_forms[0], 100);
+    fixture.form_rank(goosebumps.written_forms[0], 50);
+    fixture.form_rank(cage.written_forms[0], 3000);
+    let dictionary = fixture.open();
+    // Kana do not count in the length, so 鳥かご comes first. Then the words of 2 kanji, in order
+    // of frequency, with 鳥目, which has no rank, last.
+    let all = dictionary.character('鳥', 10).unwrap().unwrap();
+    assert_eq!(word_ids(&all.words.starting), [4, 3, 2, 1]);
+    // A limit keeps the most frequent words.
+    let two = dictionary.character('鳥', 2).unwrap().unwrap();
+    assert_eq!(word_ids(&two.words.starting), [3, 2]);
+}
+
+#[test]
+fn word_keeps_the_jmdict_order_whatever_the_frequency() {
+    let mut fixture = Fixture::new();
+    // 禽 is rare in the dramas, and 鶏 has no rank in this word. トリ is more frequent than とり.
+    let bird = fixture.word(1, &["鳥", "鶏", "禽"], &["とり", "トリ"], &["bird"]);
+    fixture.form_rank(bird.written_forms[0], 3007);
+    fixture.form_rank(bird.written_forms[2], 138941);
+    fixture.kana_rank(bird.readings[0], 16852);
+    fixture.kana_rank(bird.readings[1], 9000);
+    // ちょっと is far more frequent in kana, but the sense has no tag uk.
+    let chotto = fixture.word(2, &["一寸"], &["ちょっと"], &["a little"]);
+    fixture.form_rank(chotto.written_forms[0], 47988);
+    fixture.kana_rank(chotto.readings[0], 46);
+    let dictionary = fixture.open();
+    let entry = dictionary.word(1).unwrap().unwrap();
+    let forms: Vec<&str> = entry
+        .written_forms
+        .iter()
+        .map(|f| f.text.as_str())
+        .collect();
+    let readings: Vec<&str> = entry.readings.iter().map(|r| r.text.as_str()).collect();
+    assert_eq!(forms, ["鳥", "鶏", "禽"]);
+    assert_eq!(readings, ["とり", "トリ"]);
+    assert_eq!(entry.headword, "鳥");
+    assert_eq!(dictionary.word(2).unwrap().unwrap().headword, "一寸");
+}
+
+#[test]
+fn kana_rank_counts_only_for_a_word_in_kana() {
+    let mut fixture = Fixture::new();
+    // The kana rank of 慣れる also counts なれる of なる, so it does not count without uk.
+    let accustomed = fixture.word(1, &["慣れる"], &["なれる"], &["to get used to"]);
+    fixture.form_rank(accustomed.written_forms[0], 948);
+    fixture.kana_rank(accustomed.readings[0], 402);
+    let tame = fixture.word(2, &["馴れる"], &["なれる"], &["to become tame"]);
+    fixture.form_rank(tame.written_forms[0], 700);
+    // 為れる is usually written in kana, so its kana rank counts.
+    let can = fixture.word(3, &["為れる"], &["なれる"], &["to be able to"]);
+    fixture.usually_kana(&can);
+    fixture.form_rank(can.written_forms[0], 90000);
+    fixture.kana_rank(can.readings[0], 300);
+    assert_eq!(found(&fixture.open(), "なれる"), [3, 2, 1]);
+}
+
+#[test]
+fn kana_rank_counts_for_a_reading_of_1_word() {
+    let mut fixture = Fixture::new();
+    // No other word reads きれい, so its rank in kana counts.
+    let pretty = fixture.word(1, &["綺麗"], &["きれい"], &["pretty"]);
+    fixture.form_rank(pretty.written_forms[0], 7364);
+    fixture.kana_rank(pretty.readings[0], 675);
+    let cut = fixture.word(2, &["切れ味"], &["きれあじ"], &["sharpness"]);
+    fixture.form_rank(cut.written_forms[0], 5000);
+    assert_eq!(found(&fixture.open(), "きれ"), [1, 2]);
 }

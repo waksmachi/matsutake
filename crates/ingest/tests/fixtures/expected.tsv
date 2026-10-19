@@ -62,17 +62,17 @@ character_meaning	吾	4	one's own
 character_meaning	語	1	word
 character_meaning	語	2	speech
 character_meaning	語	3	language
-character_reading	休	1	on	キュウ	0
-character_reading	休	2	kun	やす.む	1
-character_reading	休	3	kun	やす.まる	0
-character_reading	休	4	kun	やす.める	0
-character_reading	吾	1	on	ゴ	1
-character_reading	吾	2	kun	われ	0
-character_reading	吾	3	kun	わが-	0
-character_reading	吾	4	kun	あ-	0
-character_reading	語	1	on	ゴ	0
-character_reading	語	2	kun	かた.る	2
-character_reading	語	3	kun	かた.らう	0
+character_reading	休	1	on	キュウ	0	0
+character_reading	休	2	kun	やす.む	1	1
+character_reading	休	3	kun	やす.まる	0	0
+character_reading	休	4	kun	やす.める	0	0
+character_reading	吾	1	on	ゴ	1	0
+character_reading	吾	2	kun	われ	0	0
+character_reading	吾	3	kun	わが-	0	0
+character_reading	吾	4	kun	あ-	0	0
+character_reading	語	1	on	ゴ	0	0
+character_reading	語	2	kun	かた.る	2	1
+character_reading	語	3	kun	かた.らう	0	0
 character_component	休	亻
 character_component	休	木
 character_component	吾	五

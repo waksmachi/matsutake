@@ -1,16 +1,19 @@
 //! The character query: how a kanji connects to its components, and what words use it.
 
+use std::sync::LazyLock;
+
 use rusqlite::params;
 use serde::Deserialize;
 
-use super::{Dictionary, Error, Word, WordSummary, sql_count};
+use super::{Dictionary, Error, Word, WordSummary, sql_count, word_rank};
 use crate::normalize::{normalize_char, normalize_str};
 
 /// Page of a kanji.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Kanji {
     pub character: char,
-    /// On readings, then kun readings. Each group is in order of word count, then position.
+    /// On readings, then kun readings. Each group is in order of the number of common words that
+    /// use the reading, then of all words that use it, then of position.
     pub readings: Vec<CharacterReading>,
     /// English meanings, in position order.
     pub meanings: Vec<String>,
@@ -20,8 +23,8 @@ pub struct Kanji {
     pub used_in: Vec<CharacterLink>,
     /// 1 form for each mutant of the kanji, in code point order.
     pub forms: Vec<Form>,
-    /// Full entries of the words whose written form at position 1 is exactly the kanji, in word
-    /// id order.
+    /// Full entries of the words whose written form at position 1 is exactly the kanji, in order
+    /// of frequency, then of word id.
     pub entries: Vec<Word>,
     /// Other words whose written form at position 1 contains the kanji: `word_limit` words at
     /// most. The matching form of each summary is that written form.
@@ -32,7 +35,7 @@ pub struct Kanji {
 
 /// Words that contain a kanji, by the position of the kanji in the written form at position 1.
 /// Each list is in order of the number of characters of the form that are not kana, then of the
-/// length of the form, then of word id: 鳥かご, 鳥目, then 鳥打ち.
+/// length of the form, then of frequency, then of word id: 鳥かご, 鳥目, then 鳥打ち.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct KanjiWords {
     /// Words whose form starts with the kanji, for example 私立 for 私.
@@ -93,10 +96,12 @@ SELECT x.character_id AS character, m.base_id AS base
 FROM character_component x LEFT JOIN mutant m ON m.mutant_id = x.character_id
 WHERE x.component_id = ?1 ORDER BY x.character_id";
 
-/// The readings, the on readings first. The readings of more words come first.
+/// The readings, the on readings first. The readings of more common words come first, then the
+/// readings of more words.
 const READINGS: &str = "
 SELECT type AS kind, text, word_count FROM character_reading
-WHERE character_id = ?1 ORDER BY type = 'kun', word_count DESC, position";
+WHERE character_id = ?1
+ORDER BY type = 'kun', common_word_count DESC, word_count DESC, position";
 
 const MEANINGS: &str = "
 SELECT text FROM character_meaning WHERE character_id = ?1 ORDER BY position";
@@ -104,21 +109,35 @@ SELECT text FROM character_meaning WHERE character_id = ?1 ORDER BY position";
 const MUTANTS: &str = "
 SELECT mutant_id FROM mutant WHERE base_id = ?1 ORDER BY mutant_id";
 
-/// Words whose written form at position 1 is exactly the kanji.
-const ENTRIES: &str = "
+/// Words whose written form at position 1 is exactly the kanji, in order of frequency.
+static ENTRIES: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "
 SELECT f.word_id
 FROM written_form_kanji k JOIN written_form f ON f.id = k.written_form_id
 WHERE k.kanji_id = ?1 AND f.position = 1 AND length(f.text) = 1
-ORDER BY f.word_id";
+ORDER BY rank_band({}), f.word_id",
+        word_rank("f.word_id")
+    )
+});
 
-/// The other words whose written form at position 1 contains the kanji, in order of the length
-/// of the form without kana, then of its length, then of word id.
-const WORDS: &str = "
-SELECT f.word_id, f.text
-FROM written_form_kanji k JOIN written_form f ON f.id = k.written_form_id
-WHERE k.kanji_id = ?1 AND f.position = 1 AND length(f.text) > 1
-ORDER BY length_without_kana(f.text), length(f.text), f.word_id
-LIMIT ?2";
+/// The other words whose written form at position 1 contains the kanji. The limit keeps the most
+/// frequent words. They come in order of the length of the form without kana, then of its
+/// length, then of frequency.
+static WORDS: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "
+WITH word(word_id, text, band) AS (
+  SELECT f.word_id, f.text, rank_band({})
+  FROM written_form_kanji k JOIN written_form f ON f.id = k.written_form_id
+  WHERE k.kanji_id = ?1 AND f.position = 1 AND length(f.text) > 1
+  ORDER BY 3, length_without_kana(f.text), length(f.text), f.word_id
+  LIMIT ?2)
+SELECT word_id, text FROM word
+ORDER BY length_without_kana(text), length(text), band, word_id",
+        word_rank("f.word_id")
+    )
+});
 
 const WORD_COUNT: &str = "
 SELECT count(*)
@@ -167,11 +186,11 @@ impl Dictionary {
             }
         }
         let mut entries = Vec::new();
-        for word_id in self.rows::<u32>(ENTRIES, [id])? {
+        for word_id in self.rows::<u32>(&ENTRIES, [id])? {
             entries.extend(self.word(word_id)?);
         }
         let mut words = KanjiWords::default();
-        for row in self.rows::<WordRow>(WORDS, params![id, sql_count(word_limit)])? {
+        for row in self.rows::<WordRow>(&WORDS, params![id, sql_count(word_limit)])? {
             let Some(summary) = self.summary(row.word_id, &row.text)? else {
                 continue;
             };

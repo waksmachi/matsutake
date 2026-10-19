@@ -1,9 +1,11 @@
 //! Search: the words and characters that match what the user typed.
 
+use std::sync::LazyLock;
+
 use rusqlite::params;
 use serde::Deserialize;
 
-use super::{CharacterLink, Dictionary, Error, FuriganaPart, sql_count};
+use super::{CharacterLink, Dictionary, Error, FuriganaPart, sql_count, word_rank};
 use crate::kana;
 use crate::normalize::normalize_str;
 
@@ -42,8 +44,11 @@ const FORMS: usize = 3;
 /// low and high end of the range of each form, or NULL for a form that the query does not have.
 /// `CROSS JOIN` keeps `form` in the outer loop, so each range is a lookup in the index on `text`.
 ///
-/// The window function keeps 1 row for each word: its form that the order ranks highest.
-const WORDS: &str = "
+/// The window function keeps 1 row for each word: its form that the order ranks highest. Words
+/// that tie on the form come in order of frequency, then of word id.
+static WORDS: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "
 WITH form(low, high) AS (VALUES (?1, ?2), (?3, ?4), (?5, ?6)),
 hit AS (
   SELECT f.word_id, f.text, f.position, f.text = form.low AS is_exact, 0 AS kind
@@ -60,8 +65,11 @@ ranked AS (
   FROM hit
 )
 SELECT word_id, text FROM ranked WHERE n = 1
-ORDER BY is_exact DESC, is_first DESC, length, word_id
-LIMIT ?7 OFFSET ?8";
+ORDER BY is_exact DESC, is_first DESC, length, rank_band({}), word_id
+LIMIT ?7 OFFSET ?8",
+        word_rank("ranked.word_id")
+    )
+});
 
 const FIRST_GLOSSES: &str = "
 SELECT g.text
@@ -117,7 +125,7 @@ impl Dictionary {
             Vec::new()
         } else {
             self.rows::<WordRow>(
-                WORDS,
+                &WORDS,
                 params![
                     low(0),
                     high(0),

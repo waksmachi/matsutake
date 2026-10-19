@@ -110,10 +110,23 @@ search uses the indexes on `written_form.text` and `reading.text` with a range f
 1. words where a written form or reading equals a form of the query
 2. words where the matching form is at position 1
 3. shorter matching forms
-4. word id
+4. more frequent words (below)
+5. word id
 
 A word appears once. If a word matches by more than 1 written form or reading, its matching form is
 the one that rules 1 to 3 rank highest.
+
+**Frequency.** The frequency rank of a word is its best rank in `written_form_frequency` and
+`reading_frequency`: of the word in 1 of its written forms, or in kana. A rank in kana counts for a
+word that JMdict writes in kana (a word with no written form, or a word whose first sense has the
+tag `uk`), and for a reading that no other word has: きれい is rank 675 in kana and 7364 as 綺麗,
+so 綺麗 has 675. Jiten counts a reading in kana also for other words with the same sound, so the
+kana rank of a shared reading does not count: なれる (402) also counts なれる of なる, so 慣れる
+keeps its rank as 慣れる (948). An order by frequency puts the words up to
+`jpdag::schema::COMMON_RANK` (20000) in order of rank, then the rarer words as 1 band, then the
+words with no rank. Past that rank, many words of Jiten share a rank, so the ranks of rare words
+are noise. `Dictionary::open` registers the function `rank_band` that gives the place of a rank.
+So はし gives 橋 (3285), 箸 (4834), 端 (6946), then the rarer words.
 
 **Pages.** `offset` skips that number of words in the order, and `limit` caps the number of words.
 Consecutive pages do not overlap and leave no gap. A page with fewer than `limit` words is the last
@@ -132,6 +145,9 @@ page.
 
 **The headword** is the first written form without the tag `iK`, `oK`, `rK`, or `sK`. If the first
 sense has the tag `uk`, or no written form qualifies, the headword is the reading at position 1.
+Frequency does not change the headword, nor the order of the forms and readings of a word: JMdict
+orders them with care, and within 1 word the ranks of Jiten mostly add noise, such as ２人 before
+二人 from the digits of subtitles, or なん for 何 from other words with the same sound.
 
 ### 4.3 Characters
 
@@ -283,7 +299,7 @@ the base lists them in `forms`.
 
 | Field | Value |
 | --- | --- |
-| `readings` | The KANJIDIC2 readings of the character: the on readings, then the kun readings. Each group is in order of `word_count`, highest first, then position. |
+| `readings` | The KANJIDIC2 readings of the character: the on readings, then the kun readings. Each group is in order of `character_reading.common_word_count` (the words up to `COMMON_RANK` that use the reading), highest first, then `word_count`, then position. |
 | `CharacterReading.text` | The reading as KANJIDIC2 writes it: an on reading in katakana, and a kun reading in hiragana, with a `.` before the okurigana and a `-` for a prefix or a suffix |
 | `CharacterReading.word_count` | `character_reading.word_count`: the number of words that read the character with the reading |
 | `meanings` | The English meanings of the character, from KANJIDIC2, in position order |
@@ -292,17 +308,17 @@ the base lists them in `forms`.
 | `used_in` | Characters that have it as a direct component |
 | `forms` | 1 `Form` for each `mutant` row that has the character as the base, for example 亻 for 人. The index `mutant_base_id` serves this lookup. Empty for a kanji with no mutants. |
 | `Form.used_in` | Characters that have the mutant as a direct component, for example 休 for 亻 |
-| `entries` | Full entries of the words whose written form at position 1 is exactly the character, in word id order. Empty if the character is not a word. |
+| `entries` | Full entries of the words whose written form at position 1 is exactly the character, in order of frequency (section 4.2), then word id: 方 as ほう, かた, then がた. Empty if the character is not a word. |
 | `words` | Up to `word_limit` other words whose written form at position 1 contains the character, in 3 lists. The matching form of each summary is that written form. |
 | `KanjiWords.starting` | Words whose form starts with the character, for example 私立 for 私 |
 | `KanjiWords.ending` | Words whose form ends with the character and does not start with it, for example 公私 |
 | `KanjiWords.inside` | The other words, for example 公私混同 |
 | `word_count` | Number of such words, not counting `entries` |
 
-`components`, `used_in`, and `forms` are in code point order. `word_limit` applies to the words
-of the 3 lists together, and each list keeps their order: the number of characters of the form
-that are not kana, then the length of the form, then the word id. Kana do not count, so 鳥かご
-(1) comes before 鳥目 (2), and 鳥打ち (2) after it. `jpdag::kana::length_without_kana`
+`components`, `used_in`, and `forms` are in code point order. `word_limit` keeps the most frequent
+words of the 3 lists together. Each list is in order of the number of characters of the form that
+are not kana, then the length of the form, then frequency, then the word id. Kana do not count, so
+鳥かご (1) comes before 鳥目 (2), and 鳥打ち (2) after it. `jpdag::kana::length_without_kana`
 gives the number, and `Dictionary::open` registers it as an SQL function for the query.
 
 ## 7. Errors
@@ -366,7 +382,13 @@ temporary file, with `jpdag::schema::CREATE_TABLES` and a few rows, so `jpdag` d
 | `kanji_words_use_the_first_form` | A word that has the kanji only in position 2 is not listed |
 | `kanji_word_count_exceeds_the_limit` | `word_limit` caps `words` but not `word_count` |
 | `kanji_includes_its_word_entries` | The page of 私 holds its entries in full, and not in `words` |
-| `kanji_has_its_readings_and_meanings` | The readings of 生 are its on readings, then its kun readings, each in order of word count. Its meanings are in position order. |
+| `kanji_has_its_readings_and_meanings` | The readings of 生 are its on readings, then its kun readings, each in order of common words, then of words: い.きる (40 common words of 63) before なま (25 of 138). Its meanings are in position order. |
+| `search_orders_ties_by_frequency` | はし gives 橋 (3285), 箸 (4834 in kana), 端 (6946), the 2 words past `COMMON_RANK` in word id order, then the word with no rank |
+| `kanji_entries_come_in_order_of_frequency` | 方 gives ほう (206), かた (292), then がた (no rank) |
+| `kanji_words_keep_the_most_frequent_and_order_them_in_a_length` | 鳥 gives 鳥かご, then 鳥肌, 鳥居, and 鳥目 (no rank). A `word_limit` of 2 keeps 鳥肌 and 鳥居. |
+| `word_keeps_the_jmdict_order_whatever_the_frequency` | 鳥, 鶏, 禽 and とり, トリ keep their order, though 禽 and トリ have better ranks than 鶏 and とり. 一寸 stays the headword with no `uk`, though ちょっと is rank 46 and 一寸 47988. |
+| `kana_rank_counts_for_a_reading_of_1_word` | きれ gives 綺麗 (675 as きれい, 7364 as 綺麗), then 切れ味 (5000) |
+| `kana_rank_counts_only_for_a_word_in_kana` | なれる gives 為れる (`uk`, 300 in kana), 馴れる (700), then 慣れる (948 as 慣れる; its 402 in kana does not count) |
 | `kanji_words_do_not_count_kana_in_their_length` | For 鳥, the order is 鳥かご, 鳥っぽい, 鳥目, then 鳥打ち |
 | `kanji_words_are_split_by_the_position_of_the_kanji` | For 私, 私立 is in `starting`, 公私 is in `ending`, and 公私混同 is in `inside`. A form that starts and ends with 私 is in `starting`. |
 | `character_normalizes_its_input` | ⼝ gives the page of 口 |

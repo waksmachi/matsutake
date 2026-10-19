@@ -173,6 +173,8 @@ CREATE TABLE character_reading (
   type         TEXT NOT NULL CHECK (type IN ('on', 'kun')),
   text         TEXT NOT NULL,
   word_count   INTEGER NOT NULL,                            -- words that use the reading
+  common_word_count INTEGER NOT NULL,                       -- of those, the words with a rank
+                                                            -- up to COMMON_RANK
   PRIMARY KEY (character_id, position)
 ) STRICT, WITHOUT ROWID;
 
@@ -334,9 +336,10 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
 no index on `text`.
 
-This schema is `SCHEMA_VERSION` 6. Version 5 had no `written_form_frequency` and
-`reading_frequency`, version 4 had no `accent` and `accent_tag`, version 3 had no
-`furigana`, version 2 had no `character_reading.word_count`, and version 1 had no KANJIDIC2 tables.
+This schema is `SCHEMA_VERSION` 7. Version 6 had no `character_reading.common_word_count`,
+version 5 had no `written_form_frequency` and `reading_frequency`, version 4 had no `accent` and
+`accent_tag`, version 3 had no `furigana`, version 2 had no `character_reading.word_count`, and
+version 1 had no KANJIDIC2 tables.
 
 Stage 2 gives the ids of `written_form`, `reading`, `sense`, and `tag` in the order of the word id and
 the position, so 2 builds from the same files give the same ids. The ids change when JMdict changes.
@@ -398,7 +401,7 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
 | 7. Read the furigana | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `furigana` rows, and `character_reading.word_count` of each reading |
 | 8. Read the accents | `kanjium-accents-*.txt`, and the rows of stage 2 | `accent` and `accent_tag` rows, and the `pos` tags that no sense has |
 | 9. Read the ranks | `jiten-drama.zip`, and the rows of stage 2 | `written_form_frequency` and `reading_frequency` rows |
-| 10. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, 8, and 9 | `content.db` |
+| 10. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, 8, and 9 | `character_reading.common_word_count`, and `content.db` |
 
 ### 6.1 Normalization
 
@@ -747,7 +750,12 @@ also counts the words that read the character with that reading.
 7. Add the words of the line to the words of the reading.
 
 `word_count` is the number of different words of a reading. A word that reads the character with
-the same reading in 2 written forms counts once.
+the same reading in 2 written forms counts once. Stage 10 also counts the words of each reading
+whose frequency rank (stage 9) is up to `jpdag::schema::COMMON_RANK`, as
+`character_reading.common_word_count`, so that a reading of many rare compounds comes after a
+reading of fewer, common words. The rank of a word is its best rank in a written form, or in kana
+for a word with no written form, a word with the tag `uk` on its first sense, or a reading that no
+other word has, as `jpdag::dictionary` says.
 
 **The comparison.** An on reading becomes hiragana. A kun reading loses its okurigana, the text
 after the `.`, because the furigana do not cover okurigana: かた.る becomes かた. The `-` of a
@@ -1111,6 +1119,7 @@ Each row gives the name of the test function of the case.
 | `okurigana_decide_between_kun_readings` | 生かす and 生きる, with the kun readings い.きる and い.かす of 生 | Each reading has 1 word |
 | `irregular_reading_is_reported` | 今日 as きょう (a range), 今日 as こんにち, and ひ of 日 in 日向 when 日 has only ニチ | コン and ニチ each have 1 word. The range is skipped, and the report counts 1 part with no reading. |
 | `a_word_counts_once_for_each_reading` | 2 lines that give the same word the same reading | The reading has 1 word |
+| `common_words_of_a_reading_are_counted` | 語学 and 英語 with ゴ of 語, and 英語 common | ゴ has 1 common word |
 | `parts_become_furigana_rows` | Furigana of 語る, and 2 lines of 今日 with the range `0-1:きょう` | 1 row for 語る with かた over 1 character, and 1 row for 今日 with きょう over 2 characters. The second line of 今日 gives no rows. |
 | `part_outside_the_form_fails` | A part for a character that the written form does not have | Build fails, and the error gives the line number |
 | `version_comes_from_the_file_name` | `JmdictFurigana-2026-09-25.txt`, and `JmdictFurigana.txt` | Version 2026-09-25, and no version |
@@ -1149,6 +1158,7 @@ Each row gives the name of the test function of the case.
 | `entries_of_2_words_are_counted_and_skipped` | 一寸 ちょっと of 2 words, and はし in kana alone of 2 words, none common | No rank, and the report counts 2 entries |
 | `entries_of_no_word_are_counted` | 語学 ごがく and はずだ | The report counts 2 entries |
 | `version_comes_from_the_revision` | `Jiten (Drama) 26-10-09`, and `Jiten (Drama)` | Version 2026-10-09, and the revision as it is |
+| `word_rank_is_the_best_rank_of_its_forms_and_readings` | 一寸 47988 and ちょっと 46㋕ with `uk`, 休み 80, 慣れる 948 and なれる 402㋕ with no `uk` and a word 馴れる, and 綺麗 7364 and きれい 675㋕ | 一寸 has 46, 休み 80, 慣れる 948, and 綺麗 675 |
 | `reads_the_banks_of_a_zip_in_order` | A zip with `term_meta_bank_2.json`, `index.json`, `term_meta_bank_1.json`, and a stylesheet | The index, and the banks in the order 1, 2 |
 
 ### `db.rs`
