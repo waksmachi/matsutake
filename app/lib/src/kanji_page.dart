@@ -4,7 +4,6 @@ import 'character_link.dart';
 import 'dictionary.dart';
 import 'rust/api.dart' hide character;
 import 'rust/api.dart' as api show character;
-import 'search_screen.dart';
 import 'word_page.dart';
 import 'tooltip.dart';
 
@@ -17,17 +16,11 @@ const _readingsOfEachKind = 3;
 /// The number of meanings in the header.
 const _meanings = 5;
 
-/// Opens the page of a kanji. With [highlightWordId], the page opens with the entry of that word
-/// expanded.
-void openKanjiPage(
-  NavigatorState navigator,
-  String character, {
-  int? highlightWordId,
-}) {
+/// Opens the page of a kanji.
+void openKanjiPage(NavigatorState navigator, String character) {
   navigator.push(
     MaterialPageRoute<void>(
-      builder: (context) =>
-          KanjiPage(character: character, highlightWordId: highlightWordId),
+      builder: (context) => KanjiPage(character: character),
     ),
   );
 }
@@ -35,12 +28,9 @@ void openKanjiPage(
 /// The page of a kanji: the kanji and its first readings at the top, then the tabs Dict, Chars,
 /// and Words.
 class KanjiPage extends StatefulWidget {
-  const KanjiPage({super.key, required this.character, this.highlightWordId});
+  const KanjiPage({super.key, required this.character});
 
   final String character;
-
-  /// The word whose row of the search opened the page.
-  final int? highlightWordId;
 
   @override
   State<KanjiPage> createState() => _KanjiPageState();
@@ -73,11 +63,7 @@ class _KanjiPageState extends State<KanjiPage> {
           ),
           // A tab with nothing in it is hidden.
           tabs: {
-            if (kanji.entries.isNotEmpty)
-              'Dict': _DictTab(
-                kanji: kanji,
-                highlightWordId: widget.highlightWordId,
-              ),
+            if (kanji.entries.isNotEmpty) 'Dict': _DictTab(kanji: kanji),
             if (kanji.wordCount > 0) 'Words': _WordsTab(kanji: kanji),
           },
         ),
@@ -219,47 +205,16 @@ class _Readings extends StatelessWidget {
   }
 }
 
-/// The Dict tab of a kanji page: the full entry of each word that is the kanji, 1 after the
-/// other, in word id order.
-class _DictTab extends StatefulWidget {
-  const _DictTab({required this.kanji, required this.highlightWordId});
+/// The Dict tab of a kanji page: the entry of each word that is the kanji, 1 after the other, the
+/// most frequent first. Each entry links to its word page, which has the whole of the word.
+class _DictTab extends StatelessWidget {
+  const _DictTab({required this.kanji});
 
   final Kanji kanji;
-  final int? highlightWordId;
-
-  @override
-  State<_DictTab> createState() => _DictTabState();
-}
-
-class _DictTabState extends State<_DictTab> {
-  final GlobalKey _highlightKey = GlobalKey();
-
-  @override
-  void initState() {
-    super.initState();
-    final highlight = widget.highlightWordId;
-    if (highlight == null ||
-        !widget.kanji.entries.any((entry) => entry.id == highlight)) {
-      return;
-    }
-    // The tab scrolls only as far as it must to show the entry. An entry that is taller than the
-    // tab shows its start.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = _highlightKey.currentContext;
-      if (context == null) return;
-      for (final policy in const [
-        ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-      ]) {
-        Scrollable.ensureVisible(context, alignmentPolicy: policy);
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final kanji = widget.kanji;
     return SingleChildScrollView(
       padding: pagePadding,
       child: Column(
@@ -267,25 +222,7 @@ class _DictTabState extends State<_DictTab> {
         children: [
           for (final (index, entry) in kanji.entries.indexed) ...[
             if (index > 0) Divider(height: 24, color: colors.outlineVariant),
-            if (entry.id == widget.highlightWordId)
-              DecoratedBox(
-                key: _highlightKey,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer.withValues(alpha: 0.4),
-                  border: Border(
-                    left: BorderSide(color: colors.primary, width: 3),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
-                  child: CondensedEntry(
-                    word: entry,
-                    pageCharacter: kanji.character,
-                  ),
-                ),
-              )
-            else
-              CondensedEntry(word: entry, pageCharacter: kanji.character),
+            CondensedEntry(word: entry, pageCharacter: kanji.character),
           ],
         ],
       ),
@@ -544,27 +481,9 @@ class _WordChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final reading = summary.reading;
-    // The headword with its furigana, or with its reading after it, then the gloss.
-    final headword = summary.furigana.isNotEmpty
-        ? WidgetSpan(
-            child: FuriganaText(
-              parts: summary.furigana,
-              fontSize: 16,
-              color: colors.onInverseSurface,
-            ),
-          )
-        : TextSpan(
-            text: '${summary.headword}${reading == null ? '' : '  $reading'}',
-          );
     return Tooltip(
       positionDelegate: tooltipAboveRight,
-      richMessage: TextSpan(
-        children: [
-          headword,
-          TextSpan(text: '\n${summary.gloss}'),
-        ],
-      ),
+      richMessage: wordTooltip(context, summary),
       waitDuration: const Duration(milliseconds: 300),
       child: Material(
         color: colors.surfaceContainerLow,
@@ -574,7 +493,7 @@ class _WordChip extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => openWordSummary(Navigator.of(context), summary),
+          onTap: () => openWordPage(Navigator.of(context), summary.id),
           child: Center(
             child: Text(
               _WordChips._label(summary),

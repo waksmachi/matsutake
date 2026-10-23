@@ -71,10 +71,12 @@ app/
   flutter_rust_bridge.yaml    the codegen settings: rust_root is ../crates/jpdag-ffi
   rust_builder/               the Cargokit plugin that compiles jpdag-ffi during flutter build
   assets/content.db           the output of ingest, which git ignores
+  assets/bundles/             the sentence bundles that ship, such as tatoeba.db, which git ignores
   assets/fonts/               the 2 fonts and their licences (section 5.4)
   tool/subset_fallback.sh     makes the fallback font from Plangothic P1
   lib/main.dart               opens the dictionary and shows the search screen
-  lib/src/dictionary.dart     the first-launch copy of content.db
+  lib/src/dictionary.dart     the first-launch copy of content.db and the bundles, and their
+                              attachment
   lib/src/search_screen.dart  the search screen, and the search session that its instances share
   lib/src/word_page.dart      the word page, and the header and tabs of each page
   lib/src/kanji_page.dart
@@ -123,8 +125,8 @@ page that the user opens.
   - A summary with `furigana` shows the headword with its furigana, and not the reading.
   - A summary with no `reading` shows the headword alone.
   - A summary with a `matched_form` shows it after the reading, for example "matches 鳥渡".
-- A word whose `WordSummary.kanji` is set, for example 私, opens the page of that character with
-  the word's entry expanded (see the kanji page), not a word page.
+- A word row opens the word page, also for a word that is 1 kanji, such as 私. The character row
+  of the same query opens the kanji page, and the forms of the word page link to it.
 - A query with characters but no words shows the character rows, then "No words". A query with
   neither shows "No results".
 
@@ -161,6 +163,13 @@ other word has no Words tab. A page with no tab is the header alone.
 
 The page has no header and no tabs: the written forms show the word. Under the top bar are the
 **readings** with their written forms, a line, then the **senses**, with no section headings.
+
+On the line of the first reading, after it and its pitch accents, is the **frequency rank** of
+the word (`Word.rank`), small and in a muted colour (`outline`), after a chart icon: 675 for 綺麗.
+It takes the space that the reading leaves, so it adds no line. A rank past `COMMON_RANK` (20,000) shows as "rare", because
+those ranks are noise, and a word that Jiten does not rank shows "unranked". Its tooltip is headed
+"Frequency rank (Jiten Dramas)", then gives the rank of each written form that has one, then of
+each reading, each group in order of frequency: 奇麗 7,364, 綺麗 9,122, きれい 675, キレイ 3,490.
 
 - The readings, in order, each on its own line. The written forms that a reading reads are on the
   next line, indented by 1 em, in brackets, with ・ between 2 forms: つちくれ, then 【土塊・土くれ】
@@ -212,14 +221,14 @@ The page has no header and no tabs: the written forms show the word. Under the t
   - The first 5 meanings, with a `VerticalDivider` between 2 meanings. A long list
     wraps between meanings, and a line does not start with a divider.
 - **Dict**: when the kanji is also a word, the entry of each word, 1 after the other, with a line
-  between them, the most frequent word first (方 as ほう, then かた). There is nothing to expand or
-  collapse.
+  between them, the most frequent word first (方 as ほう, then かた). The words with the kanji as
+  a later written form follow: 路 has じ and ち, then みち (道・途・路・径). There is nothing to expand or
+  collapse. An entry is short. A "Word page →" link at the right of its first reading opens the word page, which has the whole of the word: the
+  frequency, the example sentences, and what the word page gains later.
   - An entry shows its readings with their written forms, as the word page does, then all its
     senses. Each kanji of a form is a character link. The kanji of the page, or a mutant of it,
     does not open the page again: under the pointer it turns a muted colour (`outline`), and the
     pointer stays an arrow.
-  - When the page opens from a word row of the search, the entry of that word has a highlight,
-    and the tab scrolls only as far as it must to show the entry.
 - **Words**: the other words that contain the kanji, as chips. A chip shows the written form that
   contains the kanji. Its tooltip has the headword with its furigana (or with the reading after it,
   for a headword with no furigana), then the gloss, and a tap opens the page of the word. The
@@ -273,7 +282,8 @@ tooltip of the search button keeps the default place, below the button, at the t
 The theme comes from the seed #8D6E63, a brown, with 1 accent in its place: `primary` is
 vermilion, #B8341F on the light background and #FF6F4F on the dark one, each with a contrast of
 4.5:1 or more. The accent marks what is selected or live: the selected tab, the focused search
-field, and the highlighted entry. A character link turns `primary` under the pointer. Reference
+field, the links of the entries of a kanji page, and the word in an example sentence. A character
+link turns `primary` under the pointer. Reference
 content, such as the pitch accent lines, is never vermilion, so it does not look like a link.
 
 ### 5.4 Fonts

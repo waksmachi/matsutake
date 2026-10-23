@@ -23,8 +23,9 @@ pub struct Kanji {
     pub used_in: Vec<CharacterLink>,
     /// 1 form for each mutant of the kanji, in code point order.
     pub forms: Vec<Form>,
-    /// Full entries of the words whose written form at position 1 is exactly the kanji, in order
-    /// of frequency, then of word id.
+    /// Full entries of the words with a written form that is exactly the kanji: first the words
+    /// whose form at position 1 is the kanji, then the words with the kanji as a later form, such
+    /// as みち (道・途・路・径) for 路. Each group is in order of frequency, then of word id.
     pub entries: Vec<Word>,
     /// Other words whose written form at position 1 contains the kanji: `word_limit` words at
     /// most. The matching form of each summary is that written form.
@@ -109,14 +110,19 @@ SELECT text FROM character_meaning WHERE character_id = ?1 ORDER BY position";
 const MUTANTS: &str = "
 SELECT mutant_id FROM mutant WHERE base_id = ?1 ORDER BY mutant_id";
 
-/// Words whose written form at position 1 is exactly the kanji, in order of frequency.
+/// Words with a written form that is exactly the kanji: those whose form at position 1 is the
+/// kanji first, then the others, each in order of frequency. A search-only form (the tag `sK`)
+/// does not count, because the entry does not show it.
 static ENTRIES: LazyLock<String> = LazyLock::new(|| {
     format!(
         "
 SELECT f.word_id
 FROM written_form_kanji k JOIN written_form f ON f.id = k.written_form_id
-WHERE k.kanji_id = ?1 AND f.position = 1 AND length(f.text) = 1
-ORDER BY rank_band({}), f.word_id",
+WHERE k.kanji_id = ?1 AND length(f.text) = 1 AND NOT EXISTS (
+  SELECT 1 FROM written_form_tag x JOIN tag t ON t.id = x.tag_id
+  WHERE x.written_form_id = f.id AND t.name = 'sK')
+GROUP BY f.word_id
+ORDER BY min(f.position) > 1, rank_band({}), f.word_id",
         word_rank("f.word_id")
     )
 });

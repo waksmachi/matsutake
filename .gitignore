@@ -3,6 +3,8 @@
 /crates/ingest/out/
 /app/assets/content.db
 /app/assets/build-report.txt
+/app/assets/bundles/*
+!/app/assets/bundles/.gitkeep
 /app/build/
 /app/.dart_tool/
 .fvm/

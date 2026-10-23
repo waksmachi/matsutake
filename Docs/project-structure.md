@@ -16,7 +16,8 @@ matsutake/
   crates/
     jpdag/                    core library: normalization, the schema, and the dictionary
     jpdag-ffi/                bridge that exposes jpdag to Dart
-    ingest/                   binary that writes content.db
+    ingest/                   binary that writes content.db, and tatoeba, which writes the
+                              Tatoeba sentence bundle
   app/                        Flutter project
     pubspec.yaml
     flutter_rust_bridge.yaml  bridge codegen settings
@@ -24,11 +25,13 @@ matsutake/
     lib/                      Dart code of the app
     lib/src/rust/             generated Dart bindings
     assets/content.db         output of ingest, which git ignores
+    assets/bundles/           sentence bundles, such as the output of tatoeba, which git ignores
     assets/fonts/             fonts of the app, and their licences
     tool/                     script that makes the fallback font
   Docs/
     ingest-design.md          how ingest builds content.db
     jpdag-dictionary-design.md  the dictionary component of jpdag
     app-design.md             the Flutter app and the bridge to jpdag
+    bundle-design.md          sentence bundles, and the Tatoeba bundle
     future-work.md            the work that the designs leave out
 ```

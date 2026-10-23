@@ -12,12 +12,14 @@ use crate::schema::{COMMON_RANK, SCHEMA_VERSION};
 
 mod character;
 mod search;
+mod sentence;
 #[cfg(test)]
 mod tests;
 mod word;
 
 pub use character::{CharacterLink, CharacterReading, Form, Kanji, KanjiWords, ReadingKind};
 pub use search::{SearchResults, WordSummary};
+pub use sentence::{BundleInfo, MAX_BUNDLES, Sentence, SentenceWord, Translation, furigana_parts};
 pub use word::{Accent, FormReading, FuriganaPart, Gloss, Reading, Sense, Tag, Word, WrittenForm};
 
 /// Number of prepared statements that the connection keeps: more than the queries of this module.
@@ -31,11 +33,22 @@ pub enum Error {
     Row(#[from] serde_rusqlite::Error),
     #[error("content.db has schema version {found}, and this build reads version {expected}")]
     SchemaVersion { found: i32, expected: i32 },
+    #[error("{0} is not a sentence bundle")]
+    NotABundle(String),
+    #[error("the bundle has schema version {found}, and this build reads version {expected}")]
+    BundleSchemaVersion { found: i32, expected: i32 },
+    #[error("a bundle with the id {0} is already attached")]
+    DuplicateBundle(String),
+    #[error("{0} bundles are attached, the most there can be")]
+    TooManyBundles(usize),
 }
 
-/// A `content.db`, open read-only.
+/// A `content.db`, open read-only, with the sentence bundles that it attached.
 pub struct Dictionary {
     conn: Connection,
+    bundles: Vec<sentence::Attached>,
+    /// The number in the name of the schema of the next bundle.
+    next_bundle: u32,
 }
 
 impl Dictionary {
@@ -52,6 +65,9 @@ impl Dictionary {
             });
         }
         conn.set_prepared_statement_cache_capacity(STATEMENT_CACHE);
+        // A bundle can come from a user, so the views and triggers of a database may not call
+        // functions with side effects. The connection is read-only, and attaches read-only.
+        conn.pragma_update(None, "trusted_schema", false)?;
         let flags = FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC;
         // The order of the words of a kanji counts the characters that are not kana.
         conn.create_scalar_function("length_without_kana", 1, flags, |context| {
@@ -63,7 +79,11 @@ impl Dictionary {
             let rank: Option<i64> = context.get(0)?;
             Ok(rank_band(rank))
         })?;
-        Ok(Dictionary { conn })
+        Ok(Dictionary {
+            conn,
+            bundles: Vec::new(),
+            next_bundle: 1,
+        })
     }
 
     /// Runs a query, and maps each result row to a `T` by column name.
@@ -91,37 +111,51 @@ fn rank_band(rank: Option<i64>) -> i64 {
     }
 }
 
-/// The best frequency rank of the word `?1`: of the word in 1 of its written forms, or in kana.
-/// A rank in kana counts for a word that JMdict writes in kana (a word with no written form, or a
-/// word whose first sense has the tag `uk`), and for a reading that no other word has: きれい of
-/// 綺麗 is rank 675 in kana, and 7364 as 綺麗. Jiten counts a reading in kana for the words of
-/// other words with the same sound, so the kana rank of a shared reading does not count: なれる
-/// (402) also counts なれる of なる, so 慣れる keeps its rank as 慣れる (948). Each order by
-/// frequency uses this rank, with `?1` replaced by the column of the word id.
+/// Whether the kana rank of the reading `rank_r` counts for its word: for a word that JMdict
+/// writes in kana (a word with no written form, or a word whose first sense has the tag `uk`), and
+/// for a reading that no other word has. Jiten counts a reading in kana for the words of other
+/// words with the same sound, so the kana rank of a shared reading does not count: なれる (402)
+/// also counts なれる of なる, so 慣れる keeps its rank as 慣れる (948).
+const KANA_RANK_COUNTS: &str = "(
+  NOT EXISTS (SELECT 1 FROM written_form rank_g WHERE rank_g.word_id = rank_r.word_id)
+  OR NOT EXISTS (
+    SELECT 1 FROM reading rank_o
+    WHERE rank_o.text = rank_r.text AND rank_o.word_id != rank_r.word_id)
+  OR EXISTS (
+    SELECT 1 FROM sense rank_s
+    JOIN sense_tag rank_st ON rank_st.sense_id = rank_s.id
+    JOIN tag rank_t ON rank_t.id = rank_st.tag_id
+    WHERE rank_s.word_id = rank_r.word_id AND rank_s.position = 1 AND rank_t.name = 'uk'))";
+
+/// Gives the SQL expression of the frequency rank of the word whose id is in `column`, as the
+/// orders of the dictionary rank words: the best rank of the word in 1 of its written forms, or
+/// in kana where the kana rank counts ([`KANA_RANK_COUNTS`]). きれい of 綺麗 is rank 675 in kana,
+/// and 7364 as 綺麗, so 綺麗 has 675.
 ///
 /// Its aliases are its own, so that the column can be of a table that the query calls `f` or `r`.
-const WORD_RANK: &str = "(
+pub fn word_rank(column: &str) -> String {
+    format!(
+        "(
   SELECT min(rank) FROM (
     SELECT rank_ff.rank FROM written_form rank_f
     JOIN written_form_frequency rank_ff ON rank_ff.written_form_id = rank_f.id
-    WHERE rank_f.word_id = ?1
+    WHERE rank_f.word_id = {column}
     UNION ALL
     SELECT rank_rf.rank FROM reading rank_r
     JOIN reading_frequency rank_rf ON rank_rf.reading_id = rank_r.id
-    WHERE rank_r.word_id = ?1 AND (
-      NOT EXISTS (SELECT 1 FROM written_form rank_g WHERE rank_g.word_id = ?1)
-      OR NOT EXISTS (
-        SELECT 1 FROM reading rank_o
-        WHERE rank_o.text = rank_r.text AND rank_o.word_id != rank_r.word_id)
-      OR EXISTS (
-        SELECT 1 FROM sense rank_s
-        JOIN sense_tag rank_st ON rank_st.sense_id = rank_s.id
-        JOIN tag rank_t ON rank_t.id = rank_st.tag_id
-        WHERE rank_s.word_id = ?1 AND rank_s.position = 1 AND rank_t.name = 'uk'))))";
+    WHERE rank_r.word_id = {column} AND {KANA_RANK_COUNTS}))"
+    )
+}
 
-/// Gives [`WORD_RANK`] for the word id in `column`.
-fn word_rank(column: &str) -> String {
-    WORD_RANK.replace("?1", column)
+/// Gives the SQL expression of the kana rank of the reading whose id is in `column`, if it counts
+/// for its word ([`KANA_RANK_COUNTS`]).
+pub(crate) fn kana_rank(column: &str) -> String {
+    format!(
+        "(
+  SELECT rank_rf.rank FROM reading rank_r
+  JOIN reading_frequency rank_rf ON rank_rf.reading_id = rank_r.id
+  WHERE rank_r.id = {column} AND {KANA_RANK_COUNTS})"
+    )
 }
 
 /// Gives `count` as the value of a `LIMIT` or an `OFFSET`.

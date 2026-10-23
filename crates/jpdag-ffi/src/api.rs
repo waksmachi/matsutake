@@ -37,6 +37,7 @@ pub struct WordSummary {
 pub struct Word {
     pub id: u32,
     pub headword: String,
+    pub rank: Option<u32>,
     pub written_forms: Vec<WrittenForm>,
     pub readings: Vec<Reading>,
     pub senses: Vec<Sense>,
@@ -46,6 +47,7 @@ pub struct WrittenForm {
     pub text: String,
     pub kanji: Vec<CharacterLink>,
     pub tags: Vec<Tag>,
+    pub rank: Option<u32>,
     pub readings: Vec<FormReading>,
 }
 
@@ -66,6 +68,7 @@ pub struct Reading {
     pub tags: Vec<Tag>,
     pub morae: Vec<String>,
     pub accents: Vec<Accent>,
+    pub rank: Option<u32>,
 }
 
 pub struct Accent {
@@ -132,6 +135,47 @@ pub struct Form {
     pub used_in: Vec<CharacterLink>,
 }
 
+pub struct BundleInfo {
+    pub id: String,
+    pub title: String,
+    pub version: String,
+    pub licence: String,
+    pub attribution: String,
+    pub url: Option<String>,
+}
+
+pub struct Sentence {
+    pub bundle: String,
+    pub id: i64,
+    pub text: String,
+    pub furigana: Vec<FuriganaPart>,
+    pub translations: Vec<Translation>,
+    pub author: Option<String>,
+    pub url: Option<String>,
+    pub checked: bool,
+    pub word_start: Option<u32>,
+    pub word_end: Option<u32>,
+    pub words: Vec<SentenceWord>,
+}
+
+pub struct SentenceWord {
+    pub start: u32,
+    pub end: u32,
+    pub word: WordSummary,
+}
+
+pub struct Translation {
+    pub language: String,
+    pub text: String,
+    pub author: Option<String>,
+}
+
+/// The last frequency rank that orders words: the ranks past it are noise.
+#[frb(sync)]
+pub fn common_rank() -> u32 {
+    jpdag::schema::COMMON_RANK
+}
+
 pub fn open_dictionary(path: String) -> Result<Dictionary> {
     let dictionary = jpdag::Dictionary::open(Path::new(&path))?;
     Ok(Dictionary(Mutex::new(dictionary)))
@@ -168,6 +212,31 @@ pub fn character(
     Ok(kanji.map(Kanji::from))
 }
 
+/// Attaches the sentence bundle at `path`, and gives its description.
+pub fn attach_bundle(dictionary: &Dictionary, path: String) -> Result<BundleInfo> {
+    let info = dictionary.lock().attach_bundle(Path::new(&path))?;
+    Ok(info.into())
+}
+
+/// The bundles that the dictionary attached, for the attribution of their sentences.
+pub fn bundles(dictionary: &Dictionary) -> Vec<BundleInfo> {
+    convert(dictionary.lock().bundles())
+}
+
+/// The example sentences of a word, `limit` at most after the first `offset`.
+pub fn sentences(
+    dictionary: &Dictionary,
+    word_id: u32,
+    offset: u32,
+    limit: u32,
+) -> Result<Vec<Sentence>> {
+    Ok(convert(dictionary.lock().sentences(
+        word_id,
+        offset as usize,
+        limit as usize,
+    )?))
+}
+
 fn convert<T, U: From<T>>(items: Vec<T>) -> Vec<U> {
     items.into_iter().map(U::from).collect()
 }
@@ -200,6 +269,7 @@ impl From<jpdag::dictionary::Word> for Word {
         Word {
             id: word.id,
             headword: word.headword,
+            rank: word.rank,
             written_forms: convert(word.written_forms),
             readings: convert(word.readings),
             senses: convert(word.senses),
@@ -213,6 +283,7 @@ impl From<jpdag::dictionary::WrittenForm> for WrittenForm {
             text: form.text,
             kanji: convert(form.kanji),
             tags: convert(form.tags),
+            rank: form.rank,
             readings: convert(form.readings),
         }
     }
@@ -245,6 +316,7 @@ impl From<jpdag::dictionary::Reading> for Reading {
             tags: convert(reading.tags),
             morae: reading.morae,
             accents: convert(reading.accents),
+            rank: reading.rank,
         }
     }
 }
@@ -342,6 +414,57 @@ impl From<jpdag::dictionary::Form> for Form {
         Form {
             mutant: form.mutant.into(),
             used_in: convert(form.used_in),
+        }
+    }
+}
+
+impl From<jpdag::dictionary::BundleInfo> for BundleInfo {
+    fn from(info: jpdag::dictionary::BundleInfo) -> Self {
+        BundleInfo {
+            id: info.id,
+            title: info.title,
+            version: info.version,
+            licence: info.licence,
+            attribution: info.attribution,
+            url: info.url,
+        }
+    }
+}
+
+impl From<jpdag::dictionary::Sentence> for Sentence {
+    fn from(sentence: jpdag::dictionary::Sentence) -> Self {
+        Sentence {
+            bundle: sentence.bundle,
+            id: sentence.id,
+            text: sentence.text,
+            furigana: convert(sentence.furigana),
+            translations: convert(sentence.translations),
+            author: sentence.author,
+            url: sentence.url,
+            checked: sentence.checked,
+            word_start: sentence.word_start,
+            word_end: sentence.word_end,
+            words: convert(sentence.words),
+        }
+    }
+}
+
+impl From<jpdag::dictionary::Translation> for Translation {
+    fn from(translation: jpdag::dictionary::Translation) -> Self {
+        Translation {
+            language: translation.language,
+            text: translation.text,
+            author: translation.author,
+        }
+    }
+}
+
+impl From<jpdag::dictionary::SentenceWord> for SentenceWord {
+    fn from(word: jpdag::dictionary::SentenceWord) -> Self {
+        SentenceWord {
+            start: word.start,
+            end: word.end,
+            word: word.word.into(),
         }
     }
 }

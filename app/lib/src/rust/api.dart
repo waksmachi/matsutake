@@ -8,7 +8,10 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `convert`, `lock`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+
+/// The last frequency rank that orders words: the ranks past it are noise.
+int commonRank() => RustLib.instance.api.crateApiCommonRank();
 
 Future<Dictionary> openDictionary({required String path}) =>
     RustLib.instance.api.crateApiOpenDictionary(path: path);
@@ -39,6 +42,32 @@ Future<Kanji?> character({
   wordLimit: wordLimit,
 );
 
+/// Attaches the sentence bundle at `path`, and gives its description.
+Future<BundleInfo> attachBundle({
+  required Dictionary dictionary,
+  required String path,
+}) => RustLib.instance.api.crateApiAttachBundle(
+  dictionary: dictionary,
+  path: path,
+);
+
+/// The bundles that the dictionary attached, for the attribution of their sentences.
+Future<List<BundleInfo>> bundles({required Dictionary dictionary}) =>
+    RustLib.instance.api.crateApiBundles(dictionary: dictionary);
+
+/// The example sentences of a word, `limit` at most after the first `offset`.
+Future<List<Sentence>> sentences({
+  required Dictionary dictionary,
+  required int wordId,
+  required int offset,
+  required int limit,
+}) => RustLib.instance.api.crateApiSentences(
+  dictionary: dictionary,
+  wordId: wordId,
+  offset: offset,
+  limit: limit,
+);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Dictionary>>
 abstract class Dictionary implements RustOpaqueInterface {}
 
@@ -58,6 +87,45 @@ class Accent {
           runtimeType == other.runtimeType &&
           downstep == other.downstep &&
           partsOfSpeech == other.partsOfSpeech;
+}
+
+class BundleInfo {
+  final String id;
+  final String title;
+  final String version;
+  final String licence;
+  final String attribution;
+  final String? url;
+
+  const BundleInfo({
+    required this.id,
+    required this.title,
+    required this.version,
+    required this.licence,
+    required this.attribution,
+    this.url,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      title.hashCode ^
+      version.hashCode ^
+      licence.hashCode ^
+      attribution.hashCode ^
+      url.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BundleInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          version == other.version &&
+          licence == other.licence &&
+          attribution == other.attribution &&
+          url == other.url;
 }
 
 /// A link to a character. Each character is a `String` of 1 character.
@@ -257,6 +325,7 @@ class Reading {
   final List<Tag> tags;
   final List<String> morae;
   final List<Accent> accents;
+  final int? rank;
 
   const Reading({
     required this.text,
@@ -265,6 +334,7 @@ class Reading {
     required this.tags,
     required this.morae,
     required this.accents,
+    this.rank,
   });
 
   @override
@@ -274,7 +344,8 @@ class Reading {
       restrictedTo.hashCode ^
       tags.hashCode ^
       morae.hashCode ^
-      accents.hashCode;
+      accents.hashCode ^
+      rank.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -286,7 +357,8 @@ class Reading {
           restrictedTo == other.restrictedTo &&
           tags == other.tags &&
           morae == other.morae &&
-          accents == other.accents;
+          accents == other.accents &&
+          rank == other.rank;
 }
 
 enum ReadingKind { on_, kun }
@@ -344,6 +416,89 @@ class Sense {
           readings == other.readings;
 }
 
+class Sentence {
+  final String bundle;
+  final PlatformInt64 id;
+  final String text;
+  final List<FuriganaPart> furigana;
+  final List<Translation> translations;
+  final String? author;
+  final String? url;
+  final bool checked;
+  final int? wordStart;
+  final int? wordEnd;
+  final List<SentenceWord> words;
+
+  const Sentence({
+    required this.bundle,
+    required this.id,
+    required this.text,
+    required this.furigana,
+    required this.translations,
+    this.author,
+    this.url,
+    required this.checked,
+    this.wordStart,
+    this.wordEnd,
+    required this.words,
+  });
+
+  @override
+  int get hashCode =>
+      bundle.hashCode ^
+      id.hashCode ^
+      text.hashCode ^
+      furigana.hashCode ^
+      translations.hashCode ^
+      author.hashCode ^
+      url.hashCode ^
+      checked.hashCode ^
+      wordStart.hashCode ^
+      wordEnd.hashCode ^
+      words.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Sentence &&
+          runtimeType == other.runtimeType &&
+          bundle == other.bundle &&
+          id == other.id &&
+          text == other.text &&
+          furigana == other.furigana &&
+          translations == other.translations &&
+          author == other.author &&
+          url == other.url &&
+          checked == other.checked &&
+          wordStart == other.wordStart &&
+          wordEnd == other.wordEnd &&
+          words == other.words;
+}
+
+class SentenceWord {
+  final int start;
+  final int end;
+  final WordSummary word;
+
+  const SentenceWord({
+    required this.start,
+    required this.end,
+    required this.word,
+  });
+
+  @override
+  int get hashCode => start.hashCode ^ end.hashCode ^ word.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SentenceWord &&
+          runtimeType == other.runtimeType &&
+          start == other.start &&
+          end == other.end &&
+          word == other.word;
+}
+
 class Tag {
   final String category;
   final String name;
@@ -364,9 +519,30 @@ class Tag {
           description == other.description;
 }
 
+class Translation {
+  final String language;
+  final String text;
+  final String? author;
+
+  const Translation({required this.language, required this.text, this.author});
+
+  @override
+  int get hashCode => language.hashCode ^ text.hashCode ^ author.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Translation &&
+          runtimeType == other.runtimeType &&
+          language == other.language &&
+          text == other.text &&
+          author == other.author;
+}
+
 class Word {
   final int id;
   final String headword;
+  final int? rank;
   final List<WrittenForm> writtenForms;
   final List<Reading> readings;
   final List<Sense> senses;
@@ -374,6 +550,7 @@ class Word {
   const Word({
     required this.id,
     required this.headword,
+    this.rank,
     required this.writtenForms,
     required this.readings,
     required this.senses,
@@ -383,6 +560,7 @@ class Word {
   int get hashCode =>
       id.hashCode ^
       headword.hashCode ^
+      rank.hashCode ^
       writtenForms.hashCode ^
       readings.hashCode ^
       senses.hashCode;
@@ -394,6 +572,7 @@ class Word {
           runtimeType == other.runtimeType &&
           id == other.id &&
           headword == other.headword &&
+          rank == other.rank &&
           writtenForms == other.writtenForms &&
           readings == other.readings &&
           senses == other.senses;
@@ -446,18 +625,24 @@ class WrittenForm {
   final String text;
   final List<CharacterLink> kanji;
   final List<Tag> tags;
+  final int? rank;
   final List<FormReading> readings;
 
   const WrittenForm({
     required this.text,
     required this.kanji,
     required this.tags,
+    this.rank,
     required this.readings,
   });
 
   @override
   int get hashCode =>
-      text.hashCode ^ kanji.hashCode ^ tags.hashCode ^ readings.hashCode;
+      text.hashCode ^
+      kanji.hashCode ^
+      tags.hashCode ^
+      rank.hashCode ^
+      readings.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -467,5 +652,6 @@ class WrittenForm {
           text == other.text &&
           kanji == other.kanji &&
           tags == other.tags &&
+          rank == other.rank &&
           readings == other.readings;
 }

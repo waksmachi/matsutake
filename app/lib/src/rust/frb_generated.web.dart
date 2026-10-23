@@ -61,7 +61,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Kanji dco_decode_box_autoadd_kanji(dynamic raw);
 
   @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   Word dco_decode_box_autoadd_word(dynamic raw);
+
+  @protected
+  BundleInfo dco_decode_bundle_info(dynamic raw);
 
   @protected
   CharacterLink dco_decode_character_link(dynamic raw);
@@ -85,6 +91,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
   Kanji dco_decode_kanji(dynamic raw);
 
   @protected
@@ -95,6 +104,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<Accent> dco_decode_list_accent(dynamic raw);
+
+  @protected
+  List<BundleInfo> dco_decode_list_bundle_info(dynamic raw);
 
   @protected
   List<CharacterLink> dco_decode_list_character_link(dynamic raw);
@@ -124,7 +136,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Sense> dco_decode_list_sense(dynamic raw);
 
   @protected
+  List<Sentence> dco_decode_list_sentence(dynamic raw);
+
+  @protected
+  List<SentenceWord> dco_decode_list_sentence_word(dynamic raw);
+
+  @protected
   List<Tag> dco_decode_list_tag(dynamic raw);
+
+  @protected
+  List<Translation> dco_decode_list_translation(dynamic raw);
 
   @protected
   List<Word> dco_decode_list_word(dynamic raw);
@@ -142,6 +163,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Kanji? dco_decode_opt_box_autoadd_kanji(dynamic raw);
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
   Word? dco_decode_opt_box_autoadd_word(dynamic raw);
 
   @protected
@@ -157,13 +181,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Sense dco_decode_sense(dynamic raw);
 
   @protected
+  Sentence dco_decode_sentence(dynamic raw);
+
+  @protected
+  SentenceWord dco_decode_sentence_word(dynamic raw);
+
+  @protected
   Tag dco_decode_tag(dynamic raw);
+
+  @protected
+  Translation dco_decode_translation(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
+
+  @protected
+  void dco_decode_unit(dynamic raw);
 
   @protected
   BigInt dco_decode_usize(dynamic raw);
@@ -211,7 +247,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Kanji sse_decode_box_autoadd_kanji(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   Word sse_decode_box_autoadd_word(SseDeserializer deserializer);
+
+  @protected
+  BundleInfo sse_decode_bundle_info(SseDeserializer deserializer);
 
   @protected
   CharacterLink sse_decode_character_link(SseDeserializer deserializer);
@@ -235,6 +277,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
   Kanji sse_decode_kanji(SseDeserializer deserializer);
 
   @protected
@@ -245,6 +290,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<Accent> sse_decode_list_accent(SseDeserializer deserializer);
+
+  @protected
+  List<BundleInfo> sse_decode_list_bundle_info(SseDeserializer deserializer);
 
   @protected
   List<CharacterLink> sse_decode_list_character_link(
@@ -280,7 +328,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Sense> sse_decode_list_sense(SseDeserializer deserializer);
 
   @protected
+  List<Sentence> sse_decode_list_sentence(SseDeserializer deserializer);
+
+  @protected
+  List<SentenceWord> sse_decode_list_sentence_word(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<Tag> sse_decode_list_tag(SseDeserializer deserializer);
+
+  @protected
+  List<Translation> sse_decode_list_translation(SseDeserializer deserializer);
 
   @protected
   List<Word> sse_decode_list_word(SseDeserializer deserializer);
@@ -298,6 +357,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Kanji? sse_decode_opt_box_autoadd_kanji(SseDeserializer deserializer);
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   Word? sse_decode_opt_box_autoadd_word(SseDeserializer deserializer);
 
   @protected
@@ -313,13 +375,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Sense sse_decode_sense(SseDeserializer deserializer);
 
   @protected
+  Sentence sse_decode_sentence(SseDeserializer deserializer);
+
+  @protected
+  SentenceWord sse_decode_sentence_word(SseDeserializer deserializer);
+
+  @protected
   Tag sse_decode_tag(SseDeserializer deserializer);
+
+  @protected
+  Translation sse_decode_translation(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
+
+  @protected
+  void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
@@ -373,7 +447,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_kanji(Kanji self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_word(Word self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_bundle_info(BundleInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_character_link(CharacterLink self, SseSerializer serializer);
@@ -400,6 +480,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
   void sse_encode_kanji(Kanji self, SseSerializer serializer);
 
   @protected
@@ -410,6 +493,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_accent(List<Accent> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_bundle_info(
+    List<BundleInfo> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_character_link(
@@ -454,7 +543,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_sense(List<Sense> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_sentence(List<Sentence> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_sentence_word(
+    List<SentenceWord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_tag(List<Tag> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_translation(
+    List<Translation> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_word(List<Word> self, SseSerializer serializer);
@@ -478,6 +582,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_kanji(Kanji? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_word(Word? self, SseSerializer serializer);
 
   @protected
@@ -493,13 +600,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_sense(Sense self, SseSerializer serializer);
 
   @protected
+  void sse_encode_sentence(Sentence self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sentence_word(SentenceWord self, SseSerializer serializer);
+
+  @protected
   void sse_encode_tag(Tag self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_translation(Translation self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_unit(void self, SseSerializer serializer);
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);

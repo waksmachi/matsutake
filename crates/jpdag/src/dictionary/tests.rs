@@ -9,7 +9,10 @@ use rusqlite::{Connection, params};
 use super::search::forms;
 use super::*;
 use crate::normalize::normalize_str;
-use crate::schema::{CREATE_TABLES, SCHEMA_VERSION};
+use crate::schema::{
+    BUNDLE_APPLICATION_ID, BUNDLE_SCHEMA_VERSION, CREATE_BUNDLE_TABLES, CREATE_TABLES,
+    SCHEMA_VERSION,
+};
 
 const MOUND: char = '\u{2ED6}'; // ⻖
 const CITY: char = '\u{2ECF}'; // ⻏
@@ -547,11 +550,13 @@ fn word_keeps_every_part_in_order() {
     let expected = Word {
         id: 7,
         headword: "語学".into(),
+        rank: None,
         written_forms: vec![
             WrittenForm {
                 text: "語学".into(),
                 kanji: vec![kanji('語'), kanji('学')],
                 tags: vec![],
+                rank: None,
                 readings: vec![FormReading {
                     text: "ごがく".into(),
                     // No furigana rows: the whole reading over the whole form.
@@ -565,6 +570,7 @@ fn word_keeps_every_part_in_order() {
                 text: "攵語".into(),
                 kanji: vec![mutant('攵', '攴'), kanji('語')],
                 tags: vec![tag("ke_inf", "rK")],
+                rank: None,
                 readings: vec![],
             },
         ],
@@ -575,6 +581,7 @@ fn word_keeps_every_part_in_order() {
                 restricted_to: vec!["語学".into()],
                 tags: vec![],
                 morae: vec!["ご".into(), "が".into(), "く".into()],
+                rank: None,
                 accents: vec![
                     Accent {
                         downstep: 1,
@@ -592,6 +599,7 @@ fn word_keeps_every_part_in_order() {
                 restricted_to: vec![],
                 tags: vec![tag("re_inf", "ik")],
                 morae: vec!["ゴ".into(), "ガ".into(), "ク".into()],
+                rank: None,
                 accents: vec![],
             },
         ],
@@ -1037,6 +1045,29 @@ fn kanji_entries_come_in_order_of_frequency() {
 }
 
 #[test]
+fn kanji_entries_include_the_words_with_the_kanji_as_a_later_form() {
+    let mut fixture = Fixture::new();
+    let road = fixture.word(1, &["道", "途", "路"], &["みち"], &["road"]);
+    fixture.form_rank(road.written_forms[0], 300);
+    fixture.word(2, &["路"], &["ろ"], &["road (suffix)"]);
+    // A search-only form gives no entry.
+    let hidden = fixture.word(3, &["御路", "路"], &["おみち"], &["hidden"]);
+    fixture.tag("written_form", hidden.written_forms[1], "ke_inf", "sK");
+    let dictionary = fixture.open();
+    let ids = |c| -> Vec<u32> {
+        page(&dictionary, c)
+            .entries
+            .iter()
+            .map(|word| word.id)
+            .collect()
+    };
+    // ろ, whose first form is 路, comes before the more frequent みち.
+    assert_eq!(ids('路'), [2, 1]);
+    assert_eq!(ids('途'), [1]);
+    assert_eq!(ids('道'), [1]);
+}
+
+#[test]
 fn kanji_words_keep_the_most_frequent_and_order_them_in_a_length() {
     let mut fixture = Fixture::new();
     fixture.word(1, &["鳥目"], &["とりめ"], &["night blindness"]);
@@ -1101,6 +1132,32 @@ fn kana_rank_counts_only_for_a_word_in_kana() {
 }
 
 #[test]
+fn word_gives_its_ranks_and_the_kana_ranks_that_count() {
+    let mut fixture = Fixture::new();
+    let pretty = fixture.word(1, &["綺麗", "奇麗"], &["きれい"], &["pretty"]);
+    fixture.form_rank(pretty.written_forms[0], 7364);
+    fixture.kana_rank(pretty.readings[0], 675);
+    // なれる is a reading of 2 words, so its kana rank does not count for 慣れる.
+    let accustomed = fixture.word(2, &["慣れる"], &["なれる"], &["to get used to"]);
+    fixture.form_rank(accustomed.written_forms[0], 948);
+    fixture.kana_rank(accustomed.readings[0], 402);
+    fixture.word(3, &["馴れる"], &["なれる"], &["to become tame"]);
+    let dictionary = fixture.open();
+
+    let entry = dictionary.word(1).unwrap().unwrap();
+    assert_eq!(entry.rank, Some(675));
+    let forms: Vec<_> = entry.written_forms.iter().map(|f| f.rank).collect();
+    assert_eq!(forms, [Some(7364), None]);
+    assert_eq!(entry.readings[0].rank, Some(675));
+
+    let entry = dictionary.word(2).unwrap().unwrap();
+    assert_eq!(entry.rank, Some(948));
+    assert_eq!(entry.readings[0].rank, None);
+
+    assert_eq!(dictionary.word(3).unwrap().unwrap().rank, None);
+}
+
+#[test]
 fn kana_rank_counts_for_a_reading_of_1_word() {
     let mut fixture = Fixture::new();
     // No other word reads きれい, so its rank in kana counts.
@@ -1110,4 +1167,247 @@ fn kana_rank_counts_for_a_reading_of_1_word() {
     let cut = fixture.word(2, &["切れ味"], &["きれあじ"], &["sharpness"]);
     fixture.form_rank(cut.written_forms[0], 5000);
     assert_eq!(found(&fixture.open(), "きれ"), [1, 2]);
+}
+
+/// A sentence bundle with the rows of 1 test. The file is deleted when the bundle drops.
+struct BundleFixture {
+    path: PathBuf,
+    conn: Connection,
+}
+
+impl BundleFixture {
+    fn new(id: &str) -> BundleFixture {
+        static COUNT: AtomicU32 = AtomicU32::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "jpdag-bundle-{}-{}.db",
+            std::process::id(),
+            COUNT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = fs::remove_file(&path);
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(CREATE_BUNDLE_TABLES).unwrap();
+        conn.pragma_update(None, "user_version", BUNDLE_SCHEMA_VERSION)
+            .unwrap();
+        conn.pragma_update(None, "application_id", BUNDLE_APPLICATION_ID)
+            .unwrap();
+        conn.execute(
+            "INSERT INTO bundle VALUES (?1, 'Test sentences', '2026-10-23', 'CC BY 2.0 FR', \
+             'by the testers', NULL, 'https://example.org/{id}')",
+            [id],
+        )
+        .unwrap();
+        BundleFixture { path, conn }
+    }
+
+    /// A sentence with the word `word_id` at the characters `span`.
+    fn sentence(
+        &self,
+        id: i64,
+        text: &str,
+        furigana: Option<&str>,
+        word_id: u32,
+        span: (u32, u32),
+        checked: bool,
+    ) {
+        self.conn
+            .execute(
+                "INSERT INTO sentence VALUES (?1, ?2, ?3, 'tom')",
+                params![id, text, furigana],
+            )
+            .unwrap();
+        self.conn
+            .execute(
+                "INSERT INTO translation VALUES (?1, 1, 'eng', ?2, 'mary')",
+                params![id, format!("English of {id}")],
+            )
+            .unwrap();
+        self.conn
+            .execute(
+                "INSERT INTO sentence_word VALUES (?1, ?2, 1, NULL, ?3, ?4, ?5)",
+                params![word_id, id, span.0, span.1, checked],
+            )
+            .unwrap();
+    }
+}
+
+impl BundleFixture {
+    /// 1 more word of the sentence `id`, at the characters `span`.
+    fn word(&self, id: i64, position: u32, word_id: u32, span: (u32, u32)) {
+        self.conn
+            .execute(
+                "INSERT INTO sentence_word VALUES (?1, ?2, ?3, NULL, ?4, ?5, 0)",
+                params![word_id, id, position, span.0, span.1],
+            )
+            .unwrap();
+    }
+}
+
+impl Drop for BundleFixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn sentence_ids(sentences: &[Sentence]) -> Vec<(String, i64)> {
+    sentences.iter().map(|s| (s.bundle.clone(), s.id)).collect()
+}
+
+fn part(text: &str, kana: Option<&str>) -> FuriganaPart {
+    FuriganaPart {
+        text: text.into(),
+        kana: kana.map(Into::into),
+    }
+}
+
+#[test]
+fn furigana_split_per_kanji_or_per_run() {
+    assert_eq!(
+        furigana_parts("[場所|ば|しょ]とかある？").unwrap(),
+        [
+            part("場", Some("ば")),
+            part("所", Some("しょ")),
+            part("とかある？", None)
+        ]
+    );
+    assert_eq!(
+        furigana_parts("[今日|きょう]は").unwrap(),
+        [part("今日", Some("きょう")), part("は", None)]
+    );
+    assert_eq!(furigana_parts("[壊れ"), None);
+}
+
+#[test]
+fn sentences_come_from_an_attached_bundle() {
+    let fixture = Fixture::new();
+    let bundle = BundleFixture::new("tatoeba");
+    bundle.sentence(
+        10,
+        "猫が好きです。",
+        Some("[猫|ねこ]が[好|す]きです。"),
+        1,
+        (0, 1),
+        false,
+    );
+    let mut dictionary = fixture.open();
+    let info = dictionary.attach_bundle(&bundle.path).unwrap();
+    assert_eq!(info.id, "tatoeba");
+    assert_eq!(dictionary.bundles(), [info]);
+    let sentences = dictionary.sentences(1, 0, 10).unwrap();
+    assert_eq!(sentences.len(), 1);
+    let sentence = &sentences[0];
+    assert_eq!(sentence.text, "猫が好きです。");
+    assert_eq!(sentence.furigana[0], part("猫", Some("ねこ")));
+    assert_eq!(sentence.translations[0].text, "English of 10");
+    assert_eq!(sentence.url.as_deref(), Some("https://example.org/10"));
+    assert_eq!((sentence.word_start, sentence.word_end), (Some(0), Some(1)));
+    assert!(dictionary.sentences(2, 0, 10).unwrap().is_empty());
+}
+
+#[test]
+fn sentences_put_checked_examples_first_then_shorter_ones() {
+    let fixture = Fixture::new();
+    let bundle = BundleFixture::new("tatoeba");
+    bundle.sentence(1, "猫がとても好きです。", None, 1, (0, 1), false);
+    // Furigana of an older text do not count.
+    bundle.sentence(2, "猫です。", Some("[犬|いぬ]です。"), 1, (0, 1), false);
+    bundle.sentence(3, "あの猫はとても大きいです。", None, 1, (2, 3), true);
+    let mut dictionary = fixture.open();
+    dictionary.attach_bundle(&bundle.path).unwrap();
+    let sentences = dictionary.sentences(1, 0, 10).unwrap();
+    assert_eq!(
+        sentence_ids(&sentences),
+        [
+            ("tatoeba".into(), 3),
+            ("tatoeba".into(), 2),
+            ("tatoeba".into(), 1)
+        ]
+    );
+    // A sentence with no furigana is 1 part with no kana.
+    assert_eq!(sentences[1].furigana, [part("猫です。", None)]);
+}
+
+#[test]
+fn sentences_of_2_bundles_merge_with_1_limit() {
+    let fixture = Fixture::new();
+    let first = BundleFixture::new("first");
+    first.sentence(1, "猫がとても好きです。", None, 1, (0, 1), false);
+    let second = BundleFixture::new("second");
+    second.sentence(1, "猫です。", None, 1, (0, 1), false);
+    second.sentence(2, "猫がいる。", None, 1, (0, 1), false);
+    let mut dictionary = fixture.open();
+    dictionary.attach_bundle(&first.path).unwrap();
+    dictionary.attach_bundle(&second.path).unwrap();
+    assert_eq!(
+        sentence_ids(&dictionary.sentences(1, 0, 2).unwrap()),
+        [("second".into(), 1), ("second".into(), 2)]
+    );
+    assert_eq!(dictionary.sentences(1, 0, 10).unwrap().len(), 3);
+    // The next page goes on where the first ended, across the bundles.
+    assert_eq!(
+        sentence_ids(&dictionary.sentences(1, 2, 2).unwrap()),
+        [("first".into(), 1)]
+    );
+    assert!(dictionary.sentences(1, 3, 2).unwrap().is_empty());
+}
+
+#[test]
+fn attach_rejects_what_is_not_a_bundle_and_stays_detached() {
+    let fixture = Fixture::new();
+    let mut dictionary = fixture.open();
+    // content.db is not a bundle.
+    assert!(matches!(
+        dictionary.attach_bundle(&fixture.path),
+        Err(Error::NotABundle(_))
+    ));
+    let old = BundleFixture::new("old");
+    old.conn
+        .pragma_update(None, "user_version", BUNDLE_SCHEMA_VERSION + 1)
+        .unwrap();
+    assert!(matches!(
+        dictionary.attach_bundle(&old.path),
+        Err(Error::BundleSchemaVersion { .. })
+    ));
+    let bundle = BundleFixture::new("tatoeba");
+    let twin = BundleFixture::new("tatoeba");
+    dictionary.attach_bundle(&bundle.path).unwrap();
+    assert!(matches!(
+        dictionary.attach_bundle(&twin.path),
+        Err(Error::DuplicateBundle(_))
+    ));
+    assert_eq!(dictionary.bundles().len(), 1);
+}
+
+#[test]
+fn attached_bundles_are_read_only() {
+    let fixture = Fixture::new();
+    let bundle = BundleFixture::new("tatoeba");
+    let mut dictionary = fixture.open();
+    dictionary.attach_bundle(&bundle.path).unwrap();
+    let write = dictionary.conn.execute(
+        "INSERT INTO bundle_1.sentence VALUES (99, 'x', NULL, NULL)",
+        [],
+    );
+    assert!(write.is_err());
+}
+
+#[test]
+fn sentences_give_their_words_in_text_order() {
+    let mut fixture = Fixture::new();
+    fixture.word(1, &["猫"], &["ねこ"], &["cat"]);
+    fixture.word(2, &["好き"], &["すき"], &["liked"]);
+    fixture.word(3, &["好"], &["こう"], &["good"]);
+    let bundle = BundleFixture::new("tatoeba");
+    bundle.sentence(10, "猫が好きです。", None, 1, (0, 1), false);
+    bundle.word(10, 2, 2, (2, 4));
+    // 好 overlaps 好き, so it is left out.
+    bundle.word(10, 3, 3, (2, 3));
+    let mut dictionary = fixture.open();
+    dictionary.attach_bundle(&bundle.path).unwrap();
+    let sentence = &dictionary.sentences(1, 0, 10).unwrap()[0];
+    let words: Vec<(u32, u32, u32, &str)> = sentence
+        .words
+        .iter()
+        .map(|w| (w.start, w.end, w.word.id, w.word.gloss.as_str()))
+        .collect();
+    assert_eq!(words, [(0, 1, 1, "cat"), (2, 4, 2, "liked")]);
 }

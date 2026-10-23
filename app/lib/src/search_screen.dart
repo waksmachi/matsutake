@@ -39,18 +39,7 @@ void openSearchRow(NavigatorState navigator, SearchRow row) {
     case CharacterRow(:final link):
       openKanjiPage(navigator, link.base ?? link.character);
     case WordRow(:final summary):
-      openWordSummary(navigator, summary);
-  }
-}
-
-/// Opens the page of a word. A word that is 1 kanji opens the page of that kanji with the entry
-/// of the word expanded, not a word page.
-void openWordSummary(NavigatorState navigator, WordSummary summary) {
-  final kanji = summary.kanji;
-  if (kanji != null) {
-    openKanjiPage(navigator, kanji, highlightWordId: summary.id);
-  } else {
-    openWordPage(navigator, summary.id);
+      openWordPage(navigator, summary.id);
   }
 }
 

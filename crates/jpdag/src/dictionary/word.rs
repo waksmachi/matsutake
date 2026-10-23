@@ -1,8 +1,10 @@
 //! The word query: the full entry of 1 word.
 
+use std::sync::LazyLock;
+
 use serde::Deserialize;
 
-use super::{CharacterLink, Dictionary, Error};
+use super::{CharacterLink, Dictionary, Error, kana_rank, word_rank};
 use crate::kana::morae;
 use crate::normalize::normalize_str;
 
@@ -11,6 +13,9 @@ use crate::normalize::normalize_str;
 pub struct Word {
     pub id: u32,
     pub headword: String,
+    /// The frequency rank of the word, as the orders of the dictionary rank it: the best of the
+    /// ranks of its written forms and readings. `None` if Jiten does not rank it.
+    pub rank: Option<u32>,
     pub written_forms: Vec<WrittenForm>,
     pub readings: Vec<Reading>,
     pub senses: Vec<Sense>,
@@ -22,6 +27,8 @@ pub struct WrittenForm {
     /// Kanji of the form, in text order.
     pub kanji: Vec<CharacterLink>,
     pub tags: Vec<Tag>,
+    /// The frequency rank of the word written in this form, if Jiten ranks it.
+    pub rank: Option<u32>,
     /// The readings of the form, in position order, each with its furigana for the form.
     pub readings: Vec<FormReading>,
 }
@@ -56,6 +63,10 @@ pub struct Reading {
     /// The pitch accents of the reading, in order. The first is the usual one. Empty if
     /// `content.db` has none.
     pub accents: Vec<Accent>,
+    /// The frequency rank of the word written in kana as this reading, if Jiten ranks it and the
+    /// rank counts for the word: not the rank of a reading that other words share, which Jiten
+    /// counts for all of them, unless the word is usually in kana.
+    pub rank: Option<u32>,
 }
 
 /// A pitch accent of a reading.
@@ -122,7 +133,8 @@ FROM word WHERE word.id = ?1";
 /// The written forms of a word, without the search-only forms (the tag `sK`). A search finds a
 /// word by such a form, but the entry does not show it.
 const WRITTEN_FORMS: &str = "
-SELECT f.id, f.text FROM written_form f
+SELECT f.id, f.text, ff.rank FROM written_form f
+LEFT JOIN written_form_frequency ff ON ff.written_form_id = f.id
 WHERE f.word_id = ?1 AND NOT EXISTS (
   SELECT 1 FROM written_form_tag x JOIN tag t ON t.id = x.tag_id
   WHERE x.written_form_id = f.id AND t.name = 'sK')
@@ -138,13 +150,22 @@ SELECT t.category, t.name, t.description
 FROM written_form_tag x JOIN tag t ON t.id = x.tag_id
 WHERE x.written_form_id = ?1 ORDER BY t.id";
 
-/// The readings of a word, without the search-only readings (the tag `sk`).
-const READINGS: &str = "
-SELECT r.id, r.text, r.no_kanji FROM reading r
+/// The readings of a word, without the search-only readings (the tag `sk`), with their kana ranks
+/// that count for the word.
+static READINGS: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "
+SELECT r.id, r.text, r.no_kanji, {} AS rank FROM reading r
 WHERE r.word_id = ?1 AND NOT EXISTS (
   SELECT 1 FROM reading_tag x JOIN tag t ON t.id = x.tag_id
   WHERE x.reading_id = r.id AND t.name = 'sk')
-ORDER BY r.position";
+ORDER BY r.position",
+        kana_rank("r.id")
+    )
+});
+
+/// The frequency rank of the word `?1`.
+static WORD_RANK: LazyLock<String> = LazyLock::new(|| format!("SELECT {}", word_rank("?1")));
 
 const READING_RESTRICTIONS: &str = "
 SELECT f.text
@@ -261,6 +282,7 @@ struct FuriganaRow {
 struct WrittenFormRow {
     id: u32,
     text: String,
+    rank: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -268,6 +290,7 @@ struct ReadingRow {
     id: u32,
     text: String,
     no_kanji: bool,
+    rank: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -300,7 +323,7 @@ impl Dictionary {
         // For each reading of a written form: the ids of the forms it is limited to, or `None`
         // for a reading that is not a reading of the forms (`no_kanji`).
         let mut limits: Vec<Option<Vec<u32>>> = Vec::new();
-        for row in self.rows::<ReadingRow>(READINGS, [id])? {
+        for row in self.rows::<ReadingRow>(&READINGS, [id])? {
             limits.push(if row.no_kanji {
                 None
             } else {
@@ -321,6 +344,7 @@ impl Dictionary {
                 no_kanji: row.no_kanji,
                 restricted_to: self.rows(READING_RESTRICTIONS, [row.id])?,
                 tags: self.tags(READING_TAGS, row.id)?,
+                rank: row.rank,
             });
         }
         let mut written_forms = Vec::new();
@@ -348,6 +372,7 @@ impl Dictionary {
             written_forms.push(WrittenForm {
                 kanji: self.written_form_kanji(&row)?,
                 tags: self.tags(WRITTEN_FORM_TAGS, row.id)?,
+                rank: row.rank,
                 readings: form_readings,
                 text: row.text,
             });
@@ -372,6 +397,7 @@ impl Dictionary {
         Ok(Some(Word {
             id,
             headword: head.headword(),
+            rank: self.row::<Option<u32>>(&WORD_RANK, [id])?.flatten(),
             written_forms,
             readings,
             senses,

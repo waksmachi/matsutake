@@ -183,3 +183,57 @@ CREATE INDEX written_form_tag_tag_id            ON written_form_tag(tag_id);
 CREATE INDEX reading_tag_tag_id               ON reading_tag(tag_id);
 CREATE INDEX sense_tag_tag_id                 ON sense_tag(tag_id);
 ";
+
+/// Value of `PRAGMA user_version` in a sentence bundle with the tables of
+/// [`CREATE_BUNDLE_TABLES`].
+pub const BUNDLE_SCHEMA_VERSION: i32 = 1;
+
+/// Value of `PRAGMA application_id` in a sentence bundle: "MTSB" in ASCII. It tells a bundle from
+/// `content.db` and from any other SQLite file.
+pub const BUNDLE_APPLICATION_ID: i32 = 0x4D54_5342;
+
+/// Tables and indexes of a sentence bundle: a database of example sentences that a
+/// [`Dictionary`](crate::Dictionary) attaches to `content.db`, as `Docs/bundle-design.md` gives
+/// them. Each bundle has its own ids. Its words are the ids of JMdict, the ids of `word`.
+pub const CREATE_BUNDLE_TABLES: &str = "
+CREATE TABLE bundle (                                       -- 1 row
+  id           TEXT NOT NULL,                               -- a name, unique among bundles
+  title        TEXT NOT NULL,
+  version      TEXT NOT NULL,                               -- the date of the data, or a release
+  licence      TEXT NOT NULL,
+  attribution  TEXT NOT NULL,
+  url          TEXT,
+  sentence_url TEXT                                         -- the page of a sentence, with {id}
+) STRICT;
+
+CREATE TABLE sentence (
+  id       INTEGER PRIMARY KEY,                             -- the id of the source, if it has one
+  text     TEXT NOT NULL,
+  furigana TEXT,                                            -- the text with furigana, as
+                                                            -- [場所|ば|しょ]とか: see furigana_parts
+  author   TEXT                                             -- for attribution
+) STRICT;
+
+CREATE TABLE translation (
+  sentence_id INTEGER NOT NULL REFERENCES sentence(id),
+  position    INTEGER NOT NULL,
+  language    TEXT NOT NULL,                                -- ISO 639-3, as eng
+  text        TEXT NOT NULL,
+  author      TEXT,
+  PRIMARY KEY (sentence_id, position)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE sentence_word (                                -- the words of the sentences, by word
+  word_id     INTEGER NOT NULL,                             -- JMdict ent_seq
+  sentence_id INTEGER NOT NULL REFERENCES sentence(id),
+  position    INTEGER NOT NULL,                             -- order of the words of the sentence
+  sense       INTEGER,                                      -- the position of the sense, if known
+  start       INTEGER,                                      -- characters of the sentence that
+  end         INTEGER,                                      -- the word covers, if they are known
+  checked     INTEGER NOT NULL CHECK (checked IN (0, 1)),   -- a good example of the word, as a
+                                                            -- person marked it
+  PRIMARY KEY (word_id, sentence_id, position)
+) STRICT, WITHOUT ROWID;
+
+CREATE INDEX sentence_word_sentence_id ON sentence_word(sentence_id, position);
+";

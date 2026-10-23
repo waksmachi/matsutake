@@ -17,6 +17,9 @@ design says what it does, and an item moves from this list into a design when it
 
 - frequency ranks from other lists of Jiten, such as anime or novels, for words that no drama
   uses. `ingest` reads `<ke_pri>` and `<re_pri>` of JMdict only to decide between 2 words.
+- the rank of a word in kana that JMdict also writes in rare kanji, with no `uk` on its first
+  sense: the particle の (乃, 之) has the word rank 12,868 of 乃, though it is rank 1 in kana, so
+  search puts 野 (8,032) before it. くらい (位) is the same.
 - frequency of each character. `ingest` does not read the `<freq>` rank of KANJIDIC2.
 - the "Used in" grids in order of frequency. They end in the code point.
 - components in the order that KanjiVG draws them. `character_component` has no order column.
@@ -40,7 +43,9 @@ design says what it does, and an item moves from this list into a design when it
 
 ## 5. Words
 
-- example sentences
+- example sentences: the Tatoeba bundle of `Docs/bundle-design.md` is a first version. Its
+  furigana are mostly automatic, and nothing checks the index. Sentences of native origin, and
+  readings from a lexer of our own, would replace them.
 - other text of a sense: `<lsource>`, `<xref>`, and `<ant>` of JMdict
 
 ## 6. App
@@ -85,7 +90,14 @@ design says what it does, and an item moves from this list into a design when it
   - The example sentences in a database of their own, which `content.db` attaches, so that they
     can ship and update apart from the dictionary.
 
-- an attribution page that shows the `source` table
+- an attribution page that shows the `source` table, and the `bundle` row of each sentence
+  bundle (`bundles()` gives them)
+- a way to import a sentence bundle, and to replace the copy of a bundle when the app ships a new
+  one. Now a user puts the file in the folder of bundles, and a developer deletes an old copy.
+- a link from an example sentence to its page on Tatoeba (`Sentence.url`)
+- glyphs for the characters of the bundles: `test/font_coverage_test.dart` checks `content.db`
+  only. The Tatoeba bundle has 7 characters that no font of the app has, such as ♪ and ①, and the
+  system draws them.
 - the licence of the Mozc romaji table (`crates/jpdag/data/mozc/LICENSE`) in the licences that
   the app shows. BSD 3-Clause asks for the notice in each copy of the app.
 - a touch layout. The app design assumes a window, a pointer, and a keyboard.

@@ -26,6 +26,7 @@ flutter:
   # The directory also holds build-report.txt of ingest, so each asset is listed by itself.
   assets:
     - assets/content.db
+    - assets/bundles/
     - assets/fonts/NotoSansCJKjp-LICENSE.txt
     - assets/fonts/fallback-LICENSE.txt
 
