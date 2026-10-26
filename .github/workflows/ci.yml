@@ -50,17 +50,17 @@ jobs:
         id: date
         run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
       # The cache key holds the date, so the workflow downloads the sources 1 time each day at most.
-      # The key also holds the hash of fetch.sh, which gives the KanjiVG release and the Kanjium
-      # commit.
+      # The key also holds the hashes of fetch.sh, which gives the KanjiVG release and the Kanjium
+      # commit, and of fetch-tatoeba.sh.
       - name: Restore the sources of today
         id: cache
         uses: actions/cache@v6
         with:
           path: crates/ingest/sources
-          key: ingest-sources-${{ hashFiles('crates/ingest/fetch.sh') }}-${{ steps.date.outputs.date }}
+          key: ingest-sources-${{ hashFiles('crates/ingest/fetch.sh', 'crates/ingest/fetch-tatoeba.sh') }}-${{ steps.date.outputs.date }}
       - name: Download the sources
         if: steps.cache.outputs.cache-hit != 'true'
-        run: ./fetch.sh
+        run: ./fetch.sh && ./fetch-tatoeba.sh
       - name: Run a full build
         run: >-
           cargo run --release -p ingest --
@@ -70,6 +70,7 @@ jobs:
           --furigana sources/JmdictFurigana-*.txt
           --accents sources/kanjium-accents-*.txt
           --frequency sources/jiten-drama.zip
+          --tatoeba sources/tatoeba-*
           --out out
       - name: Add the build report to the job summary
         run: |

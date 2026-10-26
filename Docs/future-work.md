@@ -20,7 +20,8 @@ design says what it does, and an item moves from this list into a design when it
 - the rank of a word in kana that JMdict also writes in rare kanji, with no `uk` on its first
   sense: the particle の (乃, 之) has the word rank 12,868 of 乃, though it is rank 1 in kana, so
   search puts 野 (8,032) before it. くらい (位) is the same.
-- frequency of each character. `ingest` does not read the `<freq>` rank of KANJIDIC2.
+- kanji ranks from a corpus of natural text. The ranks of Tatoeba favour 彼 and 私, because most
+  of its sentences come from the Tanaka Corpus, which students wrote.
 - the "Used in" grids in order of frequency. They end in the code point.
 - components in the order that KanjiVG draws them. `character_component` has no order column.
 

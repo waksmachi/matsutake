@@ -9,7 +9,7 @@ use rusqlite::Connection;
 use rusqlite::types::ValueRef;
 
 /// Tables of `content.db`, in schema order.
-const TABLES: [&str; 24] = [
+const TABLES: [&str; 25] = [
     "word",
     "character",
     "character_meaning",
@@ -29,6 +29,7 @@ const TABLES: [&str; 24] = [
     "accent_tag",
     "written_form_frequency",
     "reading_frequency",
+    "character_frequency",
     "tag",
     "written_form_tag",
     "reading_tag",
@@ -37,7 +38,7 @@ const TABLES: [&str; 24] = [
 ];
 
 /// Columns that hold a code point. The dump shows the character.
-const CHARACTER_COLUMNS: [(&str, &str); 9] = [
+const CHARACTER_COLUMNS: [(&str, &str); 10] = [
     ("character", "id"),
     ("character_meaning", "character_id"),
     ("character_reading", "character_id"),
@@ -46,6 +47,7 @@ const CHARACTER_COLUMNS: [(&str, &str); 9] = [
     ("written_form_kanji", "kanji_id"),
     ("mutant", "mutant_id"),
     ("mutant", "base_id"),
+    ("character_frequency", "character_id"),
     ("source", "attribution"),
 ];
 
@@ -87,6 +89,8 @@ fn run_ingest(out: &Path) -> String {
         .arg(fixture("kanjium-accents-685d4d7.txt"))
         .arg("--frequency")
         .arg(jiten)
+        .arg("--tatoeba")
+        .arg(fixture("tatoeba-2026-10-17"))
         .arg("--out")
         .arg(out)
         .output()
@@ -225,6 +229,13 @@ fn report_counts_match_the_fixtures() {
         "Jiten entries of 2 or more words that go to the 1 that JMdict marks as common: 0",
         "Jiten entries of 2 or more words that go to no word: 1",
         "Words with a rank: 4",
+        "  Tatoeba              2026-10-17",
+        "Tatoeba sentences: 3",
+        "Kanji in the sentences: 10",
+        "Kanji with a rank: 5",
+        "Kanji of the sentences that are not in the character set: 2",
+        "  曜 U+66DC",
+        "  猫 U+732B",
     ] {
         assert!(
             report.lines().any(|l| l == line),

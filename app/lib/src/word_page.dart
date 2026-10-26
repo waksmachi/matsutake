@@ -439,8 +439,7 @@ class FormTable extends StatelessWidget {
 }
 
 /// The frequency rank of a word, small and faint, for the line of the first reading of a word
-/// page: the rank up to [commonRank], "rare" past it, where the ranks are noise, and "unranked"
-/// for a word that Jiten does not rank. The tooltip gives the rank of each written form, then
+/// page, as [wordRankLabel] labels it. The tooltip gives the rank of each written form, then
 /// of each reading whose kana rank counts, each in order of frequency.
 class FrequencyRank extends StatelessWidget {
   const FrequencyRank({super.key, required this.word});
@@ -449,18 +448,6 @@ class FrequencyRank extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final style = TextStyle(fontSize: 12, color: colors.outline);
-    final common = commonRank();
-    final rank = word.rank;
-    final String label;
-    if (rank == null) {
-      label = 'unranked';
-    } else if (rank <= common) {
-      label = _grouped(rank);
-    } else {
-      label = 'rare';
-    }
     // The written forms, then the readings, each in order of frequency.
     int byRank((String, int) a, (String, int) b) => a.$2.compareTo(b.$2);
     final ranked = [
@@ -475,17 +462,41 @@ class FrequencyRank extends StatelessWidget {
     ];
     final message = [
       'Frequency rank (Jiten Dramas)',
-      for (final (text, rank) in ranked) '$text  ${_grouped(rank)}',
+      for (final (text, rank) in ranked) '$text  ${grouped(rank)}',
     ].join('\n');
+    return RankLabel(label: wordRankLabel(word.rank), tooltip: message);
+  }
+}
+
+/// The label of the frequency rank of a word: the rank up to [commonRank], then "uncommon" up to
+/// [rareRank] and "rare" past it, where the ranks are noise, and "unranked" for a word that Jiten
+/// does not rank.
+String wordRankLabel(int? rank) => switch (rank) {
+  null => 'unranked',
+  final rank when rank <= commonRank() => grouped(rank),
+  final rank when rank <= rareRank() => 'uncommon',
+  _ => 'rare',
+};
+
+/// A frequency rank, small and faint, after a chart icon, with a tooltip that names its list.
+class RankLabel extends StatelessWidget {
+  const RankLabel({super.key, required this.label, required this.tooltip});
+
+  final String label;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Tooltip(
       positionDelegate: tooltipAboveRight,
-      message: message,
+      message: tooltip,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.leaderboard_outlined, size: 14, color: colors.outline),
           const SizedBox(width: 4),
-          Text(label, style: style),
+          Text(label, style: TextStyle(fontSize: 12, color: colors.outline)),
         ],
       ),
     );
@@ -493,7 +504,7 @@ class FrequencyRank extends StatelessWidget {
 }
 
 /// A number with a comma between each group of 3 digits: 7,364.
-String _grouped(int number) {
+String grouped(int number) {
   final digits = '$number';
   final buffer = StringBuffer();
   for (var i = 0; i < digits.length; i++) {
@@ -798,6 +809,9 @@ class _SentenceListState extends State<SentenceList> {
   /// Whether there are sentences after those of [_sentences].
   bool _more = false;
 
+  /// The number of sentences of the word, over all the pages.
+  int _count = 0;
+
   Object? _error;
 
   @override
@@ -810,14 +824,20 @@ class _SentenceListState extends State<SentenceList> {
   Future<void> _loadPage() async {
     setState(() => _loading = true);
     try {
+      final dictionary = DictionaryScope.of(context);
       final page = await sentences(
-        dictionary: DictionaryScope.of(context),
+        dictionary: dictionary,
         wordId: widget.wordId,
         offset: _sentences.length,
         limit: widget.pageSize + 1,
       );
+      // The first page also counts the sentences of all the pages.
+      final count = _loaded
+          ? _count
+          : await sentenceCount(dictionary: dictionary, wordId: widget.wordId);
       if (!mounted) return;
       setState(() {
+        _count = count;
         _sentences.addAll(page.take(widget.pageSize));
         _more = page.length > widget.pageSize;
         _loaded = true;
@@ -852,6 +872,13 @@ class _SentenceListState extends State<SentenceList> {
       children: [
         const SizedBox(height: 16),
         Text('Examples', style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          '${grouped(_count)} ${_count == 1 ? 'sentence' : 'sentences'}',
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
         const SizedBox(height: 8),
         for (final sentence in _sentences)
           Padding(
@@ -873,16 +900,21 @@ class _SentenceListState extends State<SentenceList> {
 }
 
 /// The tooltip of a word: its headword with furigana (or with its reading after it, for a headword
-/// with no furigana), then its gloss. The word chips of a kanji page and the words of an example
-/// sentence show it.
-InlineSpan wordTooltip(BuildContext context, WordSummary summary) {
+/// with no furigana), then its gloss, then with [withRank] its frequency rank. The word chips of a
+/// kanji page and the words of an example sentence show it.
+InlineSpan wordTooltip(
+  BuildContext context,
+  WordSummary summary, {
+  bool withRank = false,
+}) {
+  final colors = Theme.of(context).colorScheme;
   final reading = summary.reading;
   final headword = summary.furigana.isNotEmpty
       ? WidgetSpan(
           child: FuriganaText(
             parts: summary.furigana,
             fontSize: 16,
-            color: Theme.of(context).colorScheme.onInverseSurface,
+            color: colors.onInverseSurface,
           ),
         )
       : TextSpan(
@@ -892,6 +924,16 @@ InlineSpan wordTooltip(BuildContext context, WordSummary summary) {
     children: [
       headword,
       TextSpan(text: '\n${summary.gloss}'),
+      if (withRank)
+        TextSpan(
+          text:
+              '\nFrequency rank (Jiten Dramas)  ${wordRankLabel(summary.rank)}',
+          // Muted: the rank is a note after the gloss.
+          style: TextStyle(
+            fontSize: 12,
+            color: colors.onInverseSurface.withValues(alpha: 0.7),
+          ),
+        ),
     ],
   );
 }

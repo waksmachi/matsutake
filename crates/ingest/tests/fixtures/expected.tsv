@@ -282,6 +282,11 @@ reading_frequency	3	46
 reading_frequency	5	3000
 reading_frequency	6	7000
 reading_frequency	11	80
+character_frequency	日	1	3
+character_frequency	休	2	2
+character_frequency	人	3	1
+character_frequency	明	3	1
+character_frequency	月	3	1
 sense_tag	1	2
 sense_tag	2	3
 sense_tag	22	3
@@ -302,6 +307,7 @@ source	KanjiVG	2025-08-16	CC BY-SA 3.0	…
 source	JmdictFurigana	2026-09-25	CC BY-SA 4.0	…
 source	Kanjium	685d4d7	CC BY-SA 4.0	…
 source	Jiten	2026-10-09	CC BY-SA 4.0	…
+source	Tatoeba	2026-10-17	CC BY 2.0 FR	…
 tag	1	ke_inf	rK	rarely used kanji form
 tag	10	field	med	medicine
 tag	11	dial	ksb	Kansai-ben

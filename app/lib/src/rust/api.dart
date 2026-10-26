@@ -13,6 +13,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 /// The last frequency rank that orders words: the ranks past it are noise.
 int commonRank() => RustLib.instance.api.crateApiCommonRank();
 
+/// The last frequency rank of an uncommon word: the words past it are rare.
+int rareRank() => RustLib.instance.api.crateApiRareRank();
+
 Future<Dictionary> openDictionary({required String path}) =>
     RustLib.instance.api.crateApiOpenDictionary(path: path);
 
@@ -66,6 +69,15 @@ Future<List<Sentence>> sentences({
   wordId: wordId,
   offset: offset,
   limit: limit,
+);
+
+/// The number of example sentences of a word in all the bundles.
+Future<int> sentenceCount({
+  required Dictionary dictionary,
+  required int wordId,
+}) => RustLib.instance.api.crateApiSentenceCount(
+  dictionary: dictionary,
+  wordId: wordId,
 );
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Dictionary>>
@@ -245,6 +257,7 @@ class Gloss {
 
 class Kanji {
   final String character;
+  final int? rank;
   final List<CharacterReading> readings;
   final List<String> meanings;
   final List<CharacterLink> components;
@@ -256,6 +269,7 @@ class Kanji {
 
   const Kanji({
     required this.character,
+    this.rank,
     required this.readings,
     required this.meanings,
     required this.components,
@@ -269,6 +283,7 @@ class Kanji {
   @override
   int get hashCode =>
       character.hashCode ^
+      rank.hashCode ^
       readings.hashCode ^
       meanings.hashCode ^
       components.hashCode ^
@@ -284,6 +299,7 @@ class Kanji {
       other is Kanji &&
           runtimeType == other.runtimeType &&
           character == other.character &&
+          rank == other.rank &&
           readings == other.readings &&
           meanings == other.meanings &&
           components == other.components &&
@@ -586,6 +602,7 @@ class WordSummary {
   final String gloss;
   final String? kanji;
   final List<FuriganaPart> furigana;
+  final int? rank;
 
   const WordSummary({
     required this.id,
@@ -595,6 +612,7 @@ class WordSummary {
     required this.gloss,
     this.kanji,
     required this.furigana,
+    this.rank,
   });
 
   @override
@@ -605,7 +623,8 @@ class WordSummary {
       matchedForm.hashCode ^
       gloss.hashCode ^
       kanji.hashCode ^
-      furigana.hashCode;
+      furigana.hashCode ^
+      rank.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -618,7 +637,8 @@ class WordSummary {
           matchedForm == other.matchedForm &&
           gloss == other.gloss &&
           kanji == other.kanji &&
-          furigana == other.furigana;
+          furigana == other.furigana &&
+          rank == other.rank;
 }
 
 class WrittenForm {

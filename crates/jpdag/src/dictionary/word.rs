@@ -165,7 +165,8 @@ ORDER BY r.position",
 });
 
 /// The frequency rank of the word `?1`.
-static WORD_RANK: LazyLock<String> = LazyLock::new(|| format!("SELECT {}", word_rank("?1")));
+pub(super) static WORD_RANK: LazyLock<String> =
+    LazyLock::new(|| format!("SELECT {}", word_rank("?1")));
 
 const READING_RESTRICTIONS: &str = "
 SELECT f.text

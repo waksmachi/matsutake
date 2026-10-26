@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 use rusqlite::params;
 use serde::Deserialize;
 
+use super::word::WORD_RANK;
 use super::{CharacterLink, Dictionary, Error, FuriganaPart, sql_count, word_rank};
 use crate::kana;
 use crate::normalize::normalize_str;
@@ -35,6 +36,8 @@ pub struct WordSummary {
     /// The headword in parts, with the furigana of the first reading of its form. Empty if the
     /// headword is a reading, or if there are no furigana.
     pub furigana: Vec<FuriganaPart>,
+    /// The frequency rank of the word, as `Word::rank`.
+    pub rank: Option<u32>,
 }
 
 /// Largest number of forms of a query that the search uses.
@@ -161,6 +164,7 @@ impl Dictionary {
             kanji: head.kanji.and_then(char::from_u32),
             furigana,
             headword,
+            rank: self.row::<Option<u32>>(&WORD_RANK, [id])?.flatten(),
         }))
     }
 }

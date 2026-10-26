@@ -32,6 +32,7 @@ pub struct WordSummary {
     pub gloss: String,
     pub kanji: Option<String>,
     pub furigana: Vec<FuriganaPart>,
+    pub rank: Option<u32>,
 }
 
 pub struct Word {
@@ -97,6 +98,7 @@ pub struct Tag {
 
 pub struct Kanji {
     pub character: String,
+    pub rank: Option<u32>,
     pub readings: Vec<CharacterReading>,
     pub meanings: Vec<String>,
     pub components: Vec<CharacterLink>,
@@ -176,6 +178,12 @@ pub fn common_rank() -> u32 {
     jpdag::schema::COMMON_RANK
 }
 
+/// The last frequency rank of an uncommon word: the words past it are rare.
+#[frb(sync)]
+pub fn rare_rank() -> u32 {
+    jpdag::schema::RARE_RANK
+}
+
 pub fn open_dictionary(path: String) -> Result<Dictionary> {
     let dictionary = jpdag::Dictionary::open(Path::new(&path))?;
     Ok(Dictionary(Mutex::new(dictionary)))
@@ -237,6 +245,11 @@ pub fn sentences(
     )?))
 }
 
+/// The number of example sentences of a word in all the bundles.
+pub fn sentence_count(dictionary: &Dictionary, word_id: u32) -> Result<u32> {
+    Ok(dictionary.lock().sentence_count(word_id)?)
+}
+
 fn convert<T, U: From<T>>(items: Vec<T>) -> Vec<U> {
     items.into_iter().map(U::from).collect()
 }
@@ -260,6 +273,7 @@ impl From<jpdag::dictionary::WordSummary> for WordSummary {
             gloss: summary.gloss,
             kanji: summary.kanji.map(String::from),
             furigana: convert(summary.furigana),
+            rank: summary.rank,
         }
     }
 }
@@ -365,6 +379,7 @@ impl From<jpdag::dictionary::Kanji> for Kanji {
     fn from(kanji: jpdag::dictionary::Kanji) -> Self {
         Kanji {
             character: kanji.character.into(),
+            rank: kanji.rank,
             readings: convert(kanji.readings),
             meanings: kanji.meanings,
             components: convert(kanji.components),

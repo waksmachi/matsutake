@@ -390,7 +390,12 @@ fn run(args: &Args) -> Result<()> {
         .map(|(jpn, mut engs)| {
             engs.sort();
             engs.dedup();
-            (jpn, engs.iter().filter_map(|eng| english.get(eng)).collect::<Vec<_>>())
+            (
+                jpn,
+                engs.iter()
+                    .filter_map(|eng| english.get(eng))
+                    .collect::<Vec<_>>(),
+            )
         })
         .filter(|(_, found)| !found.is_empty())
         .collect();
@@ -551,10 +556,18 @@ fn report(version: &str, c: &Counts) -> String {
         c.index_lines
     );
     let _ = writeln!(out, "  for deleted sentences            {:>9}", c.deleted);
-    let _ = writeln!(out, "  with no English translation      {:>9}", c.untranslated);
+    let _ = writeln!(
+        out,
+        "  with no English translation      {:>9}",
+        c.untranslated
+    );
     let _ = writeln!(out, "  with no word that resolves       {:>9}", c.no_word);
     let _ = writeln!(out, "Sentences in the bundle            {:>9}", c.sentences);
-    let _ = writeln!(out, "  English translations             {:>9}", c.translations);
+    let _ = writeln!(
+        out,
+        "  English translations             {:>9}",
+        c.translations
+    );
     let _ = writeln!(
         out,
         "  with furigana                    {:>9} ({:.1}%), {} by a person",

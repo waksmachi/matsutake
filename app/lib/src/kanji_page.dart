@@ -53,9 +53,21 @@ class _KanjiPageState extends State<KanjiPage> {
           header: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SelectableText(
-                kanji.character,
-                style: const TextStyle(fontSize: 64, height: 1.2),
+              // The frequency rank is under the kanji, in the space that the readings leave.
+              Column(
+                children: [
+                  SelectableText(
+                    kanji.character,
+                    style: const TextStyle(fontSize: 64, height: 1.2),
+                  ),
+                  RankLabel(
+                    label: switch (kanji.rank) {
+                      final rank? => grouped(rank),
+                      null => 'unranked',
+                    },
+                    tooltip: 'Frequency rank (Tatoeba)',
+                  ),
+                ],
               ),
               const SizedBox(width: 24),
               Expanded(child: _KanjiDetails(kanji: kanji)),
@@ -483,7 +495,7 @@ class _WordChip extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Tooltip(
       positionDelegate: tooltipAboveRight,
-      richMessage: wordTooltip(context, summary),
+      richMessage: wordTooltip(context, summary, withRank: true),
       waitDuration: const Duration(milliseconds: 300),
       child: Material(
         color: colors.surfaceContainerLow,

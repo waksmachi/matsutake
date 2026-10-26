@@ -166,8 +166,9 @@ The page has no header and no tabs: the written forms show the word. Under the t
 
 On the line of the first reading, after it and its pitch accents, is the **frequency rank** of
 the word (`Word.rank`), small and in a muted colour (`outline`), after a chart icon: 675 for 綺麗.
-It takes the space that the reading leaves, so it adds no line. A rank past `COMMON_RANK` (20,000) shows as "rare", because
-those ranks are noise, and a word that Jiten does not rank shows "unranked". Its tooltip is headed
+It takes the space that the reading leaves, so it adds no line. Past `COMMON_RANK` (20,000) the
+ranks are noise, so a rank shows as "uncommon" up to `RARE_RANK` (50,000), and as "rare" past it.
+A word that Jiten does not rank shows "unranked". Its tooltip is headed
 "Frequency rank (Jiten Dramas)", then gives the rank of each written form that has one, then of
 each reading, each group in order of frequency: 奇麗 7,364, 綺麗 9,122, きれい 675, キレイ 3,490.
 
@@ -208,7 +209,11 @@ each reading, each group in order of frequency: 奇麗 7,364, 綺麗 9,122, き�
 
 **Kanji page**
 
-- **The header**: the character, large. Beside it, the readings and the meanings:
+- **The header**: the character, large, with its **frequency rank** (`Kanji.rank`) under it, as
+  the word page shows the rank of a word: small, muted, after a chart icon, with the tooltip
+  "Frequency rank (Tatoeba)". A kanji that no sentence of Tatoeba has shows "unranked". The rank
+  takes the space that the readings leave beside the character, so it adds no line. Beside the
+  character, the readings and the meanings:
   - A line with the label "On" and the first 3 on readings, and a line with the label "Kun" and
     the first 3 kun readings, each in the order of `Kanji.readings` (the readings of common words
     first), with a `VerticalDivider` between 2
@@ -231,7 +236,9 @@ each reading, each group in order of frequency: 奇麗 7,364, 綺麗 9,122, き�
     pointer stays an arrow.
 - **Words**: the other words that contain the kanji, as chips. A chip shows the written form that
   contains the kanji. Its tooltip has the headword with its furigana (or with the reading after it,
-  for a headword with no furigana), then the gloss, and a tap opens the page of the word. The
+  for a headword with no furigana), then the gloss, then in a muted colour the frequency rank of
+  the word, as the word page labels it: "Frequency rank (Jiten Dramas)  18,601" for 鳥居. A tap
+  opens the page of the word. The
   sub-tabs "私…", "…私", and "…私…" hold the 3 lists of `KanjiWords`, each with its count. The page
   asks for all words of the kanji, and the tab builds only the chips in view. The chips keep the
   order of `KanjiWords`, in which kana do not count in the length of a word: 鳥かご comes with the
@@ -318,7 +325,10 @@ draws them with a font of its own.
 cargo run --release -p ingest -- --jmdict crates/ingest/sources/JMdict_e.gz \
   --kanjivg crates/ingest/sources/kanjivg-20250816.xml.gz \
   --kanjidic crates/ingest/sources/kanjidic2.xml.gz \
-  --furigana crates/ingest/sources/JmdictFurigana-2026-09-25.txt --out app/assets
+  --furigana crates/ingest/sources/JmdictFurigana-2026-09-25.txt \
+  --accents crates/ingest/sources/kanjium-accents-685d4d7.txt \
+  --frequency crates/ingest/sources/jiten-drama.zip \
+  --tatoeba crates/ingest/sources/tatoeba-2026-10-17 --out app/assets
 cd app
 fvm flutter run -d linux    # or: -d macos, or an iOS or Android device
 ```

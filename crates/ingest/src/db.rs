@@ -44,12 +44,14 @@ pub struct Rows {
     pub written_form_frequencies: Vec<(u32, u32)>,
     /// Each row as (reading_id, rank).
     pub reading_frequencies: Vec<(u32, u32)>,
+    /// Each row as (character_id, rank, count).
+    pub character_frequencies: Vec<(u32, u32, u32)>,
     pub sources: Vec<Source>,
 }
 
 impl Rows {
     /// Number of rows in each table, in schema order.
-    pub fn counts(&self) -> [(&'static str, usize); 24] {
+    pub fn counts(&self) -> [(&'static str, usize); 25] {
         let e = &self.entries;
         [
             ("word", e.words.len()),
@@ -74,6 +76,7 @@ impl Rows {
                 self.written_form_frequencies.len(),
             ),
             ("reading_frequency", self.reading_frequencies.len()),
+            ("character_frequency", self.character_frequencies.len()),
             ("tag", e.tags.len()),
             ("written_form_tag", e.written_form_tags.len()),
             ("reading_tag", e.reading_tags.len()),
@@ -166,6 +169,10 @@ fn insert_rows(tx: &Transaction, rows: &Rows) -> Result<()> {
     let mut insert = tx.prepare("INSERT INTO accent VALUES (?1, ?2, ?3, ?4)")?;
     for (id, reading_id, position, downstep) in &rows.accents {
         insert.execute(params![id, reading_id, position, downstep])?;
+    }
+    let mut insert = tx.prepare("INSERT INTO character_frequency VALUES (?1, ?2, ?3)")?;
+    for (character_id, rank, count) in &rows.character_frequencies {
+        insert.execute(params![character_id, rank, count])?;
     }
     let mut insert = tx.prepare("INSERT INTO source VALUES (?1, ?2, ?3, ?4)")?;
     for s in &rows.sources {
@@ -324,6 +331,7 @@ mod tests {
             accent_tags: vec![(1, 1)],
             written_form_frequencies: vec![(1, 120)],
             reading_frequencies: vec![(1, 300)],
+            character_frequencies: vec![(0x4F11, 412, 1830)],
             sources: vec![Source {
                 name: "JMdict",
                 version: Some("2026-09-28".into()),
@@ -339,7 +347,7 @@ mod tests {
         write(&dir, &Rows::default()).unwrap();
         let conn = Connection::open(dir.join("content.db")).unwrap();
         let tables = names(&conn, "table");
-        assert_eq!(tables.len(), 24, "{tables:?}");
+        assert_eq!(tables.len(), 25, "{tables:?}");
         assert_eq!(names(&conn, "index").len(), 8);
         assert_eq!(columns(&conn, "mutant"), ["mutant_id", "base_id"]);
         assert_eq!(

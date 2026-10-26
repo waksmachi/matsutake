@@ -12,6 +12,8 @@ use crate::normalize::{normalize_char, normalize_str};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Kanji {
     pub character: char,
+    /// The frequency rank of the kanji in the sentences of Tatoeba, if it occurs in them.
+    pub rank: Option<u32>,
     /// On readings, then kun readings. Each group is in order of the number of common words that
     /// use the reading, then of all words that use it, then of position.
     pub readings: Vec<CharacterReading>,
@@ -103,6 +105,9 @@ const READINGS: &str = "
 SELECT type AS kind, text, word_count FROM character_reading
 WHERE character_id = ?1
 ORDER BY type = 'kun', common_word_count DESC, word_count DESC, position";
+
+const RANK: &str = "
+SELECT rank FROM character_frequency WHERE character_id = ?1";
 
 const MEANINGS: &str = "
 SELECT text FROM character_meaning WHERE character_id = ?1 ORDER BY position";
@@ -213,6 +218,7 @@ impl Dictionary {
         let readings = self.rows::<ReadingRow>(READINGS, [id])?;
         Ok(Some(Kanji {
             character,
+            rank: self.row(RANK, [id])?,
             readings: readings
                 .into_iter()
                 .map(|row| CharacterReading {

@@ -1,5 +1,5 @@
 //! Builds the tables of `content.db` from JMdict, KanjiVG, `data/mutants.tsv`, KANJIDIC2,
-//! JmdictFurigana, Kanjium, and Jiten.
+//! JmdictFurigana, Kanjium, Jiten, and Tatoeba.
 //! `Docs/ingest-design.md` describes the pipeline.
 
 mod accents;
@@ -8,6 +8,7 @@ mod db;
 mod frequency;
 mod furigana;
 mod jmdict;
+mod kanji_frequency;
 mod kanji_links;
 mod kanjidic;
 mod kanjivg;
@@ -26,7 +27,8 @@ use jpdag::schema::COMMON_RANK;
 
 const USAGE: &str = "usage: ingest --jmdict JMdict_e.gz --kanjivg kanjivg-YYYYMMDD.xml.gz \
 --kanjidic kanjidic2.xml.gz --furigana JmdictFurigana-YYYY-MM-DD.txt \
---accents kanjium-accents-COMMIT.txt --frequency jiten-drama.zip --out DIR";
+--accents kanjium-accents-COMMIT.txt --frequency jiten-drama.zip \
+--tatoeba sources/tatoeba-YYYY-MM-DD --out DIR";
 
 const JMDICT_ATTRIBUTION: &str = "This app uses the JMdict dictionary file. The file is the \
 property of the Electronic Dictionary Research and Development Group, and is used in conformance \
@@ -55,6 +57,10 @@ licence. https://github.com/mifunetoshiro/kanjium";
 const JITEN_ATTRIBUTION: &str = "This app uses the word frequency list of dramas of Jiten, under \
 the Creative Commons Attribution-ShareAlike 4.0 licence. https://jiten.moe";
 
+const TATOEBA_ATTRIBUTION: &str = "This app ranks the kanji by their counts in the Japanese \
+sentences of Tatoeba, under the Creative Commons Attribution 2.0 France licence. \
+https://tatoeba.org";
+
 struct Args {
     jmdict: PathBuf,
     kanjivg: PathBuf,
@@ -62,6 +68,7 @@ struct Args {
     furigana: PathBuf,
     accents: PathBuf,
     frequency: PathBuf,
+    tatoeba: PathBuf,
     out: PathBuf,
 }
 
@@ -69,7 +76,7 @@ fn parse_args() -> Result<Args> {
     let mut args = std::env::args_os().skip(1);
     let (mut jmdict, mut kanjivg, mut kanjidic, mut furigana, mut accents, mut frequency) =
         (None, None, None, None, None, None);
-    let mut out = None;
+    let (mut tatoeba, mut out) = (None, None);
     while let Some(flag) = args.next() {
         let slot = match flag.to_str() {
             Some("--jmdict") => &mut jmdict,
@@ -78,6 +85,7 @@ fn parse_args() -> Result<Args> {
             Some("--furigana") => &mut furigana,
             Some("--accents") => &mut accents,
             Some("--frequency") => &mut frequency,
+            Some("--tatoeba") => &mut tatoeba,
             Some("--out") => &mut out,
             _ => bail!("unknown argument {flag:?}\n{USAGE}"),
         };
@@ -96,6 +104,7 @@ fn parse_args() -> Result<Args> {
         furigana: need(furigana, "--furigana")?,
         accents: need(accents, "--accents")?,
         frequency: need(frequency, "--frequency")?,
+        tatoeba: need(tatoeba, "--tatoeba")?,
         out: need(out, "--out")?,
     })
 }
@@ -111,6 +120,7 @@ struct Findings {
     furigana: furigana::Furigana,
     accents: accents::Accents,
     frequency: frequency::Frequency,
+    kanji_frequency: kanji_frequency::KanjiFrequency,
 }
 
 fn run(args: &Args) -> Result<String> {
@@ -155,6 +165,9 @@ fn run(args: &Args) -> Result<String> {
     let mut frequency = frequency::read(&args.frequency, &entries)?;
 
     // Stage 10.
+    let mut kanji_frequency = kanji_frequency::read(&args.tatoeba, &set.characters)?;
+
+    // Stage 11.
     let word_ranks = frequency.word_ranks(&entries);
     let is_common = |word_id| word_ranks.get(&word_id).is_some_and(|&r| r <= COMMON_RANK);
     let character_readings = kanjidic
@@ -184,6 +197,7 @@ fn run(args: &Args) -> Result<String> {
         accent_tags: std::mem::take(&mut accents.tags),
         written_form_frequencies: std::mem::take(&mut frequency.form_rows),
         reading_frequencies: std::mem::take(&mut frequency.reading_rows),
+        character_frequencies: std::mem::take(&mut kanji_frequency.rows),
         sources: vec![
             db::Source {
                 name: "JMdict",
@@ -227,6 +241,12 @@ fn run(args: &Args) -> Result<String> {
                 licence: "CC BY-SA 4.0",
                 attribution: JITEN_ATTRIBUTION,
             },
+            db::Source {
+                name: "Tatoeba",
+                version: kanji_frequency.version.clone(),
+                licence: "CC BY 2.0 FR",
+                attribution: TATOEBA_ATTRIBUTION,
+            },
         ],
     };
     fs::create_dir_all(&args.out)
@@ -242,6 +262,7 @@ fn run(args: &Args) -> Result<String> {
         furigana,
         accents,
         frequency,
+        kanji_frequency,
     };
     Ok(report(&rows, &findings, size))
 }
@@ -264,6 +285,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
             (None, "JmdictFurigana") => "none: the file name has no date".into(),
             (None, "Kanjium") => "none: the file name has no commit".into(),
             (None, "Jiten") => "none: the index has no revision".into(),
+            (None, "Tatoeba") => "none: the folder name has no date".into(),
             (None, _) => "none: the file has no version comment".into(),
         };
         let _ = writeln!(r, "  {:<20} {version}", source.name);
@@ -341,6 +363,7 @@ fn report(rows: &db::Rows, findings: &Findings, size: u64) -> String {
     report_furigana(&mut r, &findings.furigana);
     report_accents(&mut r, &findings.accents, &rows.accents);
     report_frequency(&mut r, &findings.frequency, rows);
+    report_kanji_frequency(&mut r, &findings.kanji_frequency, rows);
 
     let _ = writeln!(
         r,
@@ -497,6 +520,25 @@ fn report_frequency(r: &mut String, frequency: &frequency::Frequency, rows: &db:
         .copied()
         .collect();
     let _ = writeln!(r, "Words with a rank: {}", words.len());
+}
+
+/// Adds the findings of stage 10 to the report `r`.
+fn report_kanji_frequency(
+    r: &mut String,
+    frequency: &kanji_frequency::KanjiFrequency,
+    rows: &db::Rows,
+) {
+    let _ = writeln!(r, "\nTatoeba sentences: {}", frequency.sentences);
+    let _ = writeln!(r, "Kanji in the sentences: {}", frequency.occurrences);
+    let _ = writeln!(r, "Kanji with a rank: {}", rows.character_frequencies.len());
+    let _ = writeln!(
+        r,
+        "Kanji of the sentences that are not in the character set: {}",
+        frequency.outside_set.len()
+    );
+    for &c in &frequency.outside_set {
+        let _ = writeln!(r, "  {}", describe(c));
+    }
 }
 
 fn main() -> ExitCode {

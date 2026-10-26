@@ -208,6 +208,23 @@ impl Dictionary {
         self.bundles.iter().map(|b| b.info.clone()).collect()
     }
 
+    /// The number of example sentences of the word `word_id` in all the bundles: the number of
+    /// sentences that [`Dictionary::sentences`] gives over all its pages.
+    pub fn sentence_count(&self, word_id: u32) -> Result<u32, Error> {
+        let mut count = 0;
+        for bundle in &self.bundles {
+            let s = &bundle.schema;
+            let found: Option<u32> = self.row(
+                &format!(
+                    "SELECT count(DISTINCT sentence_id) FROM {s}.sentence_word WHERE word_id = ?1"
+                ),
+                [word_id],
+            )?;
+            count += found.unwrap_or(0);
+        }
+        Ok(count)
+    }
+
     /// The example sentences of the word `word_id` in all the bundles, `limit` at most after the
     /// first `offset`: first those that a person marked as good examples, then the shorter. A
     /// sentence that has the word twice comes once. Each bundle gives its first `offset + limit`,

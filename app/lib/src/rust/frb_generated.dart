@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 764018829;
+  int get rustContentHash => 1423756037;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -96,11 +96,18 @@ abstract class RustLibApi extends BaseApi {
 
   Future<Dictionary> crateApiOpenDictionary({required String path});
 
+  int crateApiRareRank();
+
   Future<SearchResults> crateApiSearch({
     required Dictionary dictionary,
     required String query,
     required int offset,
     required int limit,
+  });
+
+  Future<int> crateApiSentenceCount({
+    required Dictionary dictionary,
+    required int wordId,
   });
 
   Future<List<Sentence>> crateApiSentences({
@@ -288,6 +295,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "open_dictionary", argNames: ["path"]);
 
   @override
+  int crateApiRareRank() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiRareRankConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRareRankConstMeta =>
+      const TaskConstMeta(debugName: "rare_rank", argNames: []);
+
+  @override
   Future<SearchResults> crateApiSearch({
     required Dictionary dictionary,
     required String query,
@@ -308,7 +337,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -326,6 +355,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSearchConstMeta => const TaskConstMeta(
     debugName: "search",
     argNames: ["dictionary", "query", "offset", "limit"],
+  );
+
+  @override
+  Future<int> crateApiSentenceCount({
+    required Dictionary dictionary,
+    required int wordId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDictionary(
+            dictionary,
+            serializer,
+          );
+          sse_encode_u_32(wordId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSentenceCountConstMeta,
+        argValues: [dictionary, wordId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSentenceCountConstMeta => const TaskConstMeta(
+    debugName: "sentence_count",
+    argNames: ["dictionary", "wordId"],
   );
 
   @override
@@ -349,7 +415,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -386,7 +452,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 10,
             port: port_,
           );
         },
@@ -592,18 +658,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Kanji dco_decode_kanji(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return Kanji(
       character: dco_decode_String(arr[0]),
-      readings: dco_decode_list_character_reading(arr[1]),
-      meanings: dco_decode_list_String(arr[2]),
-      components: dco_decode_list_character_link(arr[3]),
-      usedIn: dco_decode_list_character_link(arr[4]),
-      forms: dco_decode_list_form(arr[5]),
-      entries: dco_decode_list_word(arr[6]),
-      words: dco_decode_kanji_words(arr[7]),
-      wordCount: dco_decode_u_32(arr[8]),
+      rank: dco_decode_opt_box_autoadd_u_32(arr[1]),
+      readings: dco_decode_list_character_reading(arr[2]),
+      meanings: dco_decode_list_String(arr[3]),
+      components: dco_decode_list_character_link(arr[4]),
+      usedIn: dco_decode_list_character_link(arr[5]),
+      forms: dco_decode_list_form(arr[6]),
+      entries: dco_decode_list_word(arr[7]),
+      words: dco_decode_kanji_words(arr[8]),
+      wordCount: dco_decode_u_32(arr[9]),
     );
   }
 
@@ -912,8 +979,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WordSummary dco_decode_word_summary(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return WordSummary(
       id: dco_decode_u_32(arr[0]),
       headword: dco_decode_String(arr[1]),
@@ -922,6 +989,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       gloss: dco_decode_String(arr[4]),
       kanji: dco_decode_opt_String(arr[5]),
       furigana: dco_decode_list_furigana_part(arr[6]),
+      rank: dco_decode_opt_box_autoadd_u_32(arr[7]),
     );
   }
 
@@ -1110,6 +1178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Kanji sse_decode_kanji(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_character = sse_decode_String(deserializer);
+    var var_rank = sse_decode_opt_box_autoadd_u_32(deserializer);
     var var_readings = sse_decode_list_character_reading(deserializer);
     var var_meanings = sse_decode_list_String(deserializer);
     var var_components = sse_decode_list_character_link(deserializer);
@@ -1120,6 +1189,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_wordCount = sse_decode_u_32(deserializer);
     return Kanji(
       character: var_character,
+      rank: var_rank,
       readings: var_readings,
       meanings: var_meanings,
       components: var_components,
@@ -1588,6 +1658,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_gloss = sse_decode_String(deserializer);
     var var_kanji = sse_decode_opt_String(deserializer);
     var var_furigana = sse_decode_list_furigana_part(deserializer);
+    var var_rank = sse_decode_opt_box_autoadd_u_32(deserializer);
     return WordSummary(
       id: var_id,
       headword: var_headword,
@@ -1596,6 +1667,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       gloss: var_gloss,
       kanji: var_kanji,
       furigana: var_furigana,
+      rank: var_rank,
     );
   }
 
@@ -1774,6 +1846,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_kanji(Kanji self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.character, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.rank, serializer);
     sse_encode_list_character_reading(self.readings, serializer);
     sse_encode_list_String(self.meanings, serializer);
     sse_encode_list_character_link(self.components, serializer);
@@ -2150,6 +2223,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.gloss, serializer);
     sse_encode_opt_String(self.kanji, serializer);
     sse_encode_list_furigana_part(self.furigana, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.rank, serializer);
   }
 
   @protected

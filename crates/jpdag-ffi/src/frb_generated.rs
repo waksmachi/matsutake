@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 764018829;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1423756037;
 
 // Section: executor
 
@@ -286,6 +286,35 @@ fn wire__crate__api__open_dictionary_impl(
         },
     )
 }
+fn wire__crate__api__rare_rank_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "rare_rank",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::rare_rank())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__search_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -343,6 +372,64 @@ fn wire__crate__api__search_impl(
                             api_offset,
                             api_limit,
                         )?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__sentence_count_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sentence_count",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dictionary = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Dictionary>,
+            >>::sse_decode(&mut deserializer);
+            let api_word_id = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let mut api_dictionary_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_dictionary,
+                                    0,
+                                    false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_dictionary_guard =
+                                        Some(api_dictionary.lockable_decode_sync_ref())
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_dictionary_guard = api_dictionary_guard.unwrap();
+                        let output_ok =
+                            crate::api::sentence_count(&*api_dictionary_guard, api_word_id)?;
                         std::result::Result::Ok(output_ok)
                     })(),
                 )
@@ -647,6 +734,7 @@ impl SseDecode for crate::api::Kanji {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_character = <String>::sse_decode(deserializer);
+        let mut var_rank = <Option<u32>>::sse_decode(deserializer);
         let mut var_readings = <Vec<crate::api::CharacterReading>>::sse_decode(deserializer);
         let mut var_meanings = <Vec<String>>::sse_decode(deserializer);
         let mut var_components = <Vec<crate::api::CharacterLink>>::sse_decode(deserializer);
@@ -657,6 +745,7 @@ impl SseDecode for crate::api::Kanji {
         let mut var_wordCount = <u32>::sse_decode(deserializer);
         return crate::api::Kanji {
             character: var_character,
+            rank: var_rank,
             readings: var_readings,
             meanings: var_meanings,
             components: var_components,
@@ -1147,6 +1236,7 @@ impl SseDecode for crate::api::WordSummary {
         let mut var_gloss = <String>::sse_decode(deserializer);
         let mut var_kanji = <Option<String>>::sse_decode(deserializer);
         let mut var_furigana = <Vec<crate::api::FuriganaPart>>::sse_decode(deserializer);
+        let mut var_rank = <Option<u32>>::sse_decode(deserializer);
         return crate::api::WordSummary {
             id: var_id,
             headword: var_headword,
@@ -1155,6 +1245,7 @@ impl SseDecode for crate::api::WordSummary {
             gloss: var_gloss,
             kanji: var_kanji,
             furigana: var_furigana,
+            rank: var_rank,
         };
     }
 }
@@ -1190,9 +1281,10 @@ fn pde_ffi_dispatcher_primary_impl(
         2 => wire__crate__api__bundles_impl(port, ptr, rust_vec_len, data_len),
         3 => wire__crate__api__character_impl(port, ptr, rust_vec_len, data_len),
         5 => wire__crate__api__open_dictionary_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__search_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__sentences_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__word_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__search_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__sentence_count_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__sentences_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__word_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1206,6 +1298,7 @@ fn pde_ffi_dispatcher_sync_impl(
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
         4 => wire__crate__api__common_rank_impl(ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__rare_rank_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1367,6 +1460,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::Kanji {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.character.into_into_dart().into_dart(),
+            self.rank.into_into_dart().into_dart(),
             self.readings.into_into_dart().into_dart(),
             self.meanings.into_into_dart().into_dart(),
             self.components.into_into_dart().into_dart(),
@@ -1581,6 +1675,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::WordSummary {
             self.gloss.into_into_dart().into_dart(),
             self.kanji.into_into_dart().into_dart(),
             self.furigana.into_into_dart().into_dart(),
+            self.rank.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1737,6 +1832,7 @@ impl SseEncode for crate::api::Kanji {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.character, serializer);
+        <Option<u32>>::sse_encode(self.rank, serializer);
         <Vec<crate::api::CharacterReading>>::sse_encode(self.readings, serializer);
         <Vec<String>>::sse_encode(self.meanings, serializer);
         <Vec<crate::api::CharacterLink>>::sse_encode(self.components, serializer);
@@ -2130,6 +2226,7 @@ impl SseEncode for crate::api::WordSummary {
         <String>::sse_encode(self.gloss, serializer);
         <Option<String>>::sse_encode(self.kanji, serializer);
         <Vec<crate::api::FuriganaPart>>::sse_encode(self.furigana, serializer);
+        <Option<u32>>::sse_encode(self.rank, serializer);
     }
 }
 

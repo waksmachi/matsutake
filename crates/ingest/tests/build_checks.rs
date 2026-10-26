@@ -227,6 +227,7 @@ fn sources_have_versions() {
         "JmdictFurigana",
         "Kanjium",
         "Jiten",
+        "Tatoeba",
     ] {
         assert!(sources.contains_key(name), "no source row for {name}");
     }
@@ -237,6 +238,7 @@ fn sources_have_versions() {
         "JmdictFurigana",
         "Kanjium",
         "Jiten",
+        "Tatoeba",
     ] {
         assert!(
             sources[name].is_some(),
@@ -342,6 +344,29 @@ fn readings_have_accents() {
     // An accent has the pos tags of its parts of speech, and 2 parts of speech with the same
     // downstep share 1 accent.
     assert_eq!(accents("一寸", "ちょいと"), ["0 adv", "1 adv int"]);
+}
+
+#[test]
+#[ignore]
+fn kanji_have_frequency_ranks() {
+    let conn = content_db();
+    let rank = |c: char| -> Option<i64> {
+        conn.query_row(
+            "SELECT rank FROM character_frequency WHERE character_id = ?1",
+            [u32::from(c)],
+            |r| r.get(0),
+        )
+        .ok()
+    };
+    for c in ['人', '日', '一'] {
+        assert!(rank(c).is_some_and(|r| r <= 20), "{c}");
+    }
+    // 道 is far more common than 径, which is a later form of みち.
+    assert!(rank('道').unwrap() < rank('径').unwrap());
+    let ranked: i64 = conn
+        .query_row("SELECT count(*) FROM character_frequency", [], |r| r.get(0))
+        .unwrap();
+    assert!(ranked >= 2500, "{ranked} kanji with a rank");
 }
 
 #[test]

@@ -1,12 +1,17 @@
 //! Schema of `content.db`.
 
 /// Value of `PRAGMA user_version` in a `content.db` with the tables of [`CREATE_TABLES`].
-pub const SCHEMA_VERSION: i32 = 7;
+pub const SCHEMA_VERSION: i32 = 8;
 
 /// The last frequency rank that orders words. Many words past it share a rank, because they occur
 /// a few times each in the dramas of Jiten, so their ranks are noise: lists treat them as 1 band of
 /// rare words, after the words up to this rank and before the words with no rank.
 pub const COMMON_RANK: u32 = 20_000;
+
+/// The last frequency rank of an uncommon word: the app calls the words past [`COMMON_RANK`] up to
+/// this rank uncommon, and the words past it rare. Up to it, at most about 50 words share a rank;
+/// past it, the ties grow to hundreds and then thousands of words, of a few uses each.
+pub const RARE_RANK: u32 = 50_000;
 
 /// Tables and indexes of `content.db`, as `Docs/ingest-design.md` gives them.
 pub const CREATE_TABLES: &str = "
@@ -138,6 +143,13 @@ CREATE TABLE written_form_frequency (
 CREATE TABLE reading_frequency (
   reading_id INTEGER PRIMARY KEY REFERENCES reading(id),
   rank       INTEGER NOT NULL                               -- of the word in kana, as this reading
+) STRICT;
+
+CREATE TABLE character_frequency (
+  character_id INTEGER PRIMARY KEY REFERENCES character(id),
+  rank         INTEGER NOT NULL,                            -- among the kanji of the sentences
+                                                            -- of Tatoeba
+  count        INTEGER NOT NULL                             -- of the kanji in those sentences
 ) STRICT;
 
 CREATE TABLE tag (

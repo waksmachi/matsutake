@@ -48,7 +48,8 @@ by sentence, for the words of a sentence. A word that a sentence uses twice give
 `Dictionary::sentences` gives a page of the sentences of a word: first those that a person marked
 as good examples, then the shorter, across all bundles. Each bundle gives its first `offset +
 limit` sentences in that order, and the page is the `limit` after the first `offset` of the merged
-list, so pages do not overlap. Each sentence comes with its words: the characters
+list, so pages do not overlap. `Dictionary::sentence_count` gives the number of sentences of a word
+over all the pages and bundles. Each sentence comes with its words: the characters
 of each, and its summary, as the search gives it, for a link and its tooltip. A word that overlaps
 the word before it is left out.
 
@@ -106,7 +107,8 @@ The bundle is CC BY 2.0 FR, as Tatoeba is. Each sentence keeps its author, and t
 `openBundledDictionary` copies each `.db` file of `assets/bundles/` to `bundles/` in the
 application support directory on the first launch, and attaches each `.db` file of that folder in name order. A
 file that fails to attach is left out, and the others load. The word page shows the sentences
-under the senses, 10 at a time: a "More…" button after them loads the next 10, while there are
+under the senses, with their number under the heading "Examples" in a muted colour (`outline`),
+such as "433 sentences" for みち, and 10 sentences at a time: a "More…" button after them loads the next 10, while there are
 more. Each sentence has furigana, the word of the page in the accent colour, the first translation,
 and the id and author of the sentence. Each other word of a sentence is a link to its word page: it
 turns the accent colour under the pointer, and its tooltip has its headword and gloss, as the word

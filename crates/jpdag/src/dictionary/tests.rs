@@ -356,6 +356,7 @@ fn search_matches_readings() {
                 text: "猫背".into(),
                 kana: Some("ねこぜ".into()),
             }],
+            rank: None,
         }]
     );
 }
@@ -786,6 +787,20 @@ fn kanji_words_do_not_count_kana_in_their_length() {
 }
 
 #[test]
+fn kanji_gives_its_rank_in_tatoeba() {
+    let mut fixture = Fixture::new();
+    fixture.word(1, &["日"], &["ひ"], &["day"]);
+    fixture.word(2, &["曜"], &["よう"], &["weekday"]);
+    fixture.execute(
+        "INSERT INTO character_frequency VALUES (?1, 12, 4521)",
+        [u32::from('日')],
+    );
+    let dictionary = fixture.open();
+    assert_eq!(page(&dictionary, '日').rank, Some(12));
+    assert_eq!(page(&dictionary, '曜').rank, None);
+}
+
+#[test]
 fn kanji_includes_its_word_entries() {
     let mut fixture = Fixture::new();
     fixture.word(1, &["私立"], &["しりつ"], &["private"]);
@@ -816,6 +831,7 @@ fn kanji_includes_its_word_entries() {
                 text: "私立".into(),
                 kana: Some("しりつ".into()),
             }],
+            rank: None,
         }]
     );
     assert_eq!(page.word_count, 1);
@@ -1082,6 +1098,9 @@ fn kanji_words_keep_the_most_frequent_and_order_them_in_a_length() {
     // of frequency, with 鳥目, which has no rank, last.
     let all = dictionary.character('鳥', 10).unwrap().unwrap();
     assert_eq!(word_ids(&all.words.starting), [4, 3, 2, 1]);
+    // Each summary has the rank of its word, for the tooltip of its chip.
+    let ranks: Vec<_> = all.words.starting.iter().map(|w| w.rank).collect();
+    assert_eq!(ranks, [Some(3000), Some(50), Some(100), None]);
     // A limit keeps the most frequent words.
     let two = dictionary.character('鳥', 2).unwrap().unwrap();
     assert_eq!(word_ids(&two.words.starting), [3, 2]);
@@ -1348,6 +1367,22 @@ fn sentences_of_2_bundles_merge_with_1_limit() {
         [("first".into(), 1)]
     );
     assert!(dictionary.sentences(1, 3, 2).unwrap().is_empty());
+}
+
+#[test]
+fn sentence_count_adds_the_sentences_of_each_bundle() {
+    let fixture = Fixture::new();
+    let first = BundleFixture::new("first");
+    first.sentence(1, "猫がとても好きです。", None, 1, (0, 1), false);
+    let second = BundleFixture::new("second");
+    second.sentence(1, "猫です。", None, 1, (0, 1), false);
+    second.sentence(2, "猫がいる。", None, 1, (0, 1), false);
+    let mut dictionary = fixture.open();
+    assert_eq!(dictionary.sentence_count(1).unwrap(), 0);
+    dictionary.attach_bundle(&first.path).unwrap();
+    dictionary.attach_bundle(&second.path).unwrap();
+    assert_eq!(dictionary.sentence_count(1).unwrap(), 3);
+    assert_eq!(dictionary.sentence_count(2).unwrap(), 0);
 }
 
 #[test]

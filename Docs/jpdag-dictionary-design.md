@@ -126,6 +126,8 @@ keeps its rank as 慣れる (948). An order by frequency puts the words up to
 `jpdag::schema::COMMON_RANK` (20000) in order of rank, then the rarer words as 1 band, then the
 words with no rank. Past that rank, many words of Jiten share a rank, so the ranks of rare words
 are noise. `Dictionary::open` registers the function `rank_band` that gives the place of a rank.
+`jpdag::schema::RARE_RANK` (50000) splits the rarer words into uncommon and rare words for the
+labels of the app; the orders keep them as 1 band.
 So はし gives 橋 (3285), 箸 (4834), 端 (6946), then the rarer words.
 
 **Pages.** `offset` skips that number of words in the order, and `limit` caps the number of words.
@@ -142,6 +144,7 @@ page.
 | `gloss` | Glosses of the first sense, joined with "; " |
 | `furigana` | The headword in parts, with the furigana of the first reading of its form (section 5). Empty if the headword is a reading, or a form with no kanji and no furigana for the reading. |
 | `kanji` | The character, if the word's written form at position 1 is exactly 1 kanji and that kanji is not a mutant. The app then opens the page of that character (section 6), not a word page. |
+| `rank` | The frequency rank of the word, as `Word.rank` (section 5). None if Jiten does not rank it. |
 
 **The headword** is the first written form without the tag `iK`, `oK`, `rK`, or `sK`. If the first
 sense has the tag `uk`, or no written form qualifies, the headword is the reading at position 1.
@@ -265,6 +268,7 @@ pub fn character(&self, character: char, word_limit: usize) -> Result<Option<Kan
 
 pub struct Kanji {
     pub character: char,
+    pub rank: Option<u32>,
     pub readings: Vec<CharacterReading>,
     pub meanings: Vec<String>,
     pub components: Vec<CharacterLink>,
@@ -312,6 +316,7 @@ the base lists them in `forms`.
 | `readings` | The KANJIDIC2 readings of the character: the on readings, then the kun readings. Each group is in order of `character_reading.common_word_count` (the words up to `COMMON_RANK` that use the reading), highest first, then `word_count`, then position. |
 | `CharacterReading.text` | The reading as KANJIDIC2 writes it: an on reading in katakana, and a kun reading in hiragana, with a `.` before the okurigana and a `-` for a prefix or a suffix |
 | `CharacterReading.word_count` | `character_reading.word_count`: the number of words that read the character with the reading |
+| `rank` | The frequency rank of the kanji in the Japanese sentences of Tatoeba, from `character_frequency`. `None` for a character that no sentence has. |
 | `meanings` | The English meanings of the character, from KANJIDIC2, in position order |
 | `CharacterLink.base` | Base of the character, if the character is a mutant. `None` for a kanji. The app links a mutant to its base. |
 | `components` | Its `character_component` rows: the direct components |
@@ -392,6 +397,7 @@ temporary file, with `jpdag::schema::CREATE_TABLES` and a few rows, so `jpdag` d
 | `kanji_words_use_the_first_form` | A word that has the kanji only in position 2 is not listed |
 | `kanji_word_count_exceeds_the_limit` | `word_limit` caps `words` but not `word_count` |
 | `kanji_entries_include_the_words_with_the_kanji_as_a_later_form` | 路 gives ろ, whose first form is 路, then the more frequent みち (道・途・路); 途 gives みち; a search-only form gives no entry |
+| `kanji_gives_its_rank_in_tatoeba` | 日 with a `character_frequency` row has its rank, and 曜 with none has no rank |
 | `kanji_includes_its_word_entries` | The page of 私 holds its entries in full, and not in `words` |
 | `kanji_has_its_readings_and_meanings` | The readings of 生 are its on readings, then its kun readings, each in order of common words, then of words: い.きる (40 common words of 63) before なま (25 of 138). Its meanings are in position order. |
 | `search_orders_ties_by_frequency` | はし gives 橋 (3285), 箸 (4834 in kana), 端 (6946), the 2 words past `COMMON_RANK` in word id order, then the word with no rank |

@@ -1,4 +1,4 @@
-# Ingest: JMdict, components, kanji details, reading counts, pitch accents, and word frequency
+# Ingest: JMdict, components, kanji details, reading counts, pitch accents, and frequency
 
 This document describes the design of the `ingest` crate. `ingest` populates `content.db`, the
 database of the app, from free public data sources.
@@ -24,11 +24,13 @@ The `ingest` crate builds the graph in stages.
 6. *Kanjium* gives the pitch accents of each reading.
 7. *Jiten* gives the frequency rank of each word in Japanese TV dramas, written in each of its
    written forms and in kana.
-8. Graph is written from memory into `content.db`.
+8. *Tatoeba* gives the frequency rank of each kanji: ingest counts the kanji of its Japanese
+   sentences.
+9. Graph is written from memory into `content.db`.
 
 ## 2. Scope
 
-This design covers 24 tables in 5 groups.
+This design covers 25 tables in 5 groups.
 
 The graph:
 
@@ -46,6 +48,7 @@ The details of each character, from KANJIDIC2:
 | --- | --- |
 | `character_meaning` | English meanings of each character (`<meaning>`) |
 | `character_reading` | On readings and kun readings of each character (`<reading>`), with the number of words that use each reading (from JmdictFurigana) |
+| `character_frequency` | The frequency rank of each kanji in the Japanese sentences of Tatoeba, and its count |
 
 The structure of each JMdict entry:
 
@@ -105,7 +108,7 @@ The provenance of the data:
 | On reading | A reading of a character that comes from Chinese, in katakana, for example ゴ for 語 |
 | Kun reading | A native Japanese reading of a character, in hiragana, for example かた.る for 語. A `.` comes before the okurigana, and a `-` marks a prefix or a suffix. |
 | Mora | A unit of the rhythm of a reading. Each kana is 1 mora, except a small ゃ, ゅ, ょ, ぁ, ぃ, ぅ, ぇ, ぉ, or ゎ, which joins the kana before it: きょう is 2 morae, きょ and う. A small っ, ん, and ー are each 1 mora. `jpdag::kana::morae` splits a reading into its morae. |
-| Frequency rank | The place of a word in a list of words in order of use: rank 1 is the most frequent. Jiten counts a word in 1 written form, or in kana, so a word can have a rank for each written form and for each reading: 一寸 is rank 47988 as 一寸, and rank 46 as ちょっと. |
+| Frequency rank | The place of a word in a list of words in order of use: rank 1 is the most frequent. Jiten counts a word in 1 written form, or in kana, so a word can have a rank for each written form and for each reading: 一寸 is rank 47988 as 一寸, and rank 46 as ちょっと. A kanji has a rank among the kanji of the sentences of Tatoeba. |
 | Common | A written form or a reading that JMdict marks with a priority element (`<ke_pri>` or `<re_pri>`), such as `spec1` or `news1` |
 | Pitch accent | The pattern of high and low pitch of a reading in Tokyo Japanese. Its downstep gives it: the number of morae before the pitch falls, or 0 if it does not fall in the word. はし is 2 as 橋, 1 as 箸, and 0 as 端. A reading can have more than 1 accent. |
 
@@ -119,6 +122,7 @@ The provenance of the data:
 | JmdictFurigana | `JmdictFurigana-YYYY-MM-DD.txt`, from the GitHub release | Doublevil | CC BY-SA, the licence of JMdict | The kanji of each written form that each part of its reading belongs to |
 | Kanjium | `kanjium-accents-COMMIT.txt`, `data/source_files/raw/accents.txt` at a commit of the GitHub repository | Uros O. (mifunetoshiro) | CC BY-SA 4.0 | The pitch accents of each written form and reading |
 | Jiten | `jiten-drama.zip`, the Yomitan frequency dictionary of the drama list of jiten.moe | Jiten | CC BY-SA 4.0 | The frequency rank of each word in the subtitles of Japanese TV dramas |
+| Tatoeba | `tatoeba-YYYY-MM-DD/jpn_sentences_detailed.tsv`, the Japanese sentences of a weekly export | Tatoeba | CC BY 2.0 FR | The count of each kanji in the Japanese sentences |
 
 The `fetch.sh` script downloads the sources into `crates/ingest/sources/`. The script sets the
 KanjiVG release, for example r20250816. JMdict and KANJIDIC2 have no releases, so the script
@@ -130,6 +134,11 @@ has no releases, so the script sets a commit, the last change of `accents.txt` (
 regenerates its lists each month. The script downloads the current drama list, and the `index.json`
 of the zip gives its date.
 
+`fetch-tatoeba.sh` downloads the exports of Tatoeba into `crates/ingest/sources/tatoeba-YYYY-MM-DD/`,
+named by the date of the export, for `ingest` and for the sentence bundle of
+`Docs/bundle-design.md`. `ingest` reads the Japanese sentences alone. Tatoeba publishes no kanji
+frequency list, so stage 10 counts the kanji itself.
+
 Jiten counts the words of the subtitles of about 3,000 Japanese TV dramas. Its other lists, of
 novels, games, and all media together, rank the vocabulary of written fiction higher, and the
 drama list is the nearest to everyday speech. Words that no drama uses have no rank. Past rank
@@ -140,7 +149,7 @@ are noise.
 of Kanji alive (CC BY 4.0), and the file's header credits Kanji alive (section 6.5).
 
 `content.db` is a derivative of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten, so
-CC BY-SA applies to it. The `source` table
+CC BY-SA applies to it. Its kanji ranks come from Tatoeba, under CC BY 2.0 FR. The `source` table
 holds the attribution that each licence asks for, so the app can show it.
 
 The `ingest` binary reads local files only and has no network code. The arguments of the binary give
@@ -282,6 +291,13 @@ CREATE TABLE reading_frequency (
   rank       INTEGER NOT NULL                               -- of the word in kana, as this reading
 ) STRICT;
 
+CREATE TABLE character_frequency (
+  character_id INTEGER PRIMARY KEY REFERENCES character(id),
+  rank         INTEGER NOT NULL,                            -- among the kanji of the sentences
+                                                            -- of Tatoeba
+  count        INTEGER NOT NULL                             -- of the kanji in those sentences
+) STRICT;
+
 CREATE TABLE tag (
   id          INTEGER PRIMARY KEY,
   category    TEXT NOT NULL,
@@ -310,7 +326,8 @@ CREATE TABLE sense_tag (
 
 CREATE TABLE source (
   name        TEXT PRIMARY KEY,                             -- JMdict, KanjiVG, Kanji alive, KANJIDIC2,
-                                                            -- JmdictFurigana, Kanjium, or Jiten
+                                                            -- JmdictFurigana, Kanjium, Jiten, or
+                                                            -- Tatoeba
   version     TEXT,                                         -- the file's date, or a commit
   licence     TEXT NOT NULL,
   attribution TEXT NOT NULL
@@ -336,7 +353,8 @@ contain a component, the mutants of a base, and the written forms, readings, or 
 and a character whose entry has no meaning and no reading, look the same. `character_reading` has
 no index on `text`.
 
-This schema is `SCHEMA_VERSION` 7. Version 6 had no `character_reading.common_word_count`,
+This schema is `SCHEMA_VERSION` 8. Version 7 had no `character_frequency`, version 6 had no
+`character_reading.common_word_count`,
 version 5 had no `written_form_frequency` and `reading_frequency`, version 4 had no `accent` and
 `accent_tag`, version 3 had no `furigana`, version 2 had no `character_reading.word_count`, and
 version 1 had no KANJIDIC2 tables.
@@ -387,7 +405,10 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
        ├──────────────► 9 Read the ranks ◄────── jiten-drama.zip
        │                        │
        │                        ▼
-       └──────────────► 10 Write content.db
+       │                10 Count the kanji ◄──── tatoeba-*/
+       │                        │
+       │                        ▼
+       └──────────────► 11 Write content.db
 ```
 
 | Stage | Input | Output |
@@ -401,7 +422,8 @@ as in 部. KanjiVG names the right one in each kanji, so they also stay 2 charac
 | 7. Read the furigana | `JmdictFurigana-*.txt`, and the rows of stages 2 and 6 | `furigana` rows, and `character_reading.word_count` of each reading |
 | 8. Read the accents | `kanjium-accents-*.txt`, and the rows of stage 2 | `accent` and `accent_tag` rows, and the `pos` tags that no sense has |
 | 9. Read the ranks | `jiten-drama.zip`, and the rows of stage 2 | `written_form_frequency` and `reading_frequency` rows |
-| 10. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, 8, and 9 | `character_reading.common_word_count`, and `content.db` |
+| 10. Count the kanji | `tatoeba-*/jpn_sentences_detailed.tsv`, and the character set of stage 5 | `character_frequency` rows |
+| 11. Write `content.db` | Stages 1, 2, 3, 5, 6, 7, 8, 9, and 10 | `character_reading.common_word_count`, and `content.db` |
 
 ### 6.1 Normalization
 
@@ -750,7 +772,7 @@ also counts the words that read the character with that reading.
 7. Add the words of the line to the words of the reading.
 
 `word_count` is the number of different words of a reading. A word that reads the character with
-the same reading in 2 written forms counts once. Stage 10 also counts the words of each reading
+the same reading in 2 written forms counts once. Stage 11 also counts the words of each reading
 whose frequency rank (stage 9) is up to `jpdag::schema::COMMON_RANK`, as
 `character_reading.common_word_count`, so that a reading of many rare compounds comes after a
 reading of fewer, common words. The rank of a word is its best rank in a written form, or in kana
@@ -868,13 +890,35 @@ the same number of times share a rank. Stage 9 does not cut the list: the dictio
 use the ranks of rare words. The file gives the version of Jiten. If `index.json` has no revision,
 the version is NULL, and the build report says so.
 
-### 6.11 Stage 10: Write `content.db`
+### 6.11 Stage 10: Count the kanji
 
-Stage 10 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
+`jpn_sentences_detailed.tsv` holds 1 Japanese sentence on each line: its id, the language, the
+text, the author, and 2 dates, separated by tabs.
+
+1. Normalize the text of each sentence (section 6.1).
+2. Count each kanji of the text, each time that it occurs. A kanji is a code point of the CJK
+   Unified Ideographs blocks: U+4E00 to U+9FFF, U+3400 to U+4DBF, and U+20000 to U+3FFFF. 々 and
+   〆 stand for kanji, but are not kanji.
+3. Rank the kanji by their count: rank 1 is the most frequent. Kanji with the same count share the
+   rank of the first of them, as the ranks of Jiten do.
+4. Give a `character_frequency` row to each kanji of the character set of stage 5. A kanji of the
+   sentences that is not in the set keeps its place in the ranks, and the build report lists it.
+
+The name of the folder gives the version, the date of the export: `tatoeba-2026-10-17` gives
+2026-10-17. If the name has no date, the version is NULL, and the build report says so.
+
+The export of 2026-10-17 has 248,939 sentences and 1,187,289 kanji. 3,017 kanji of the character
+set have a rank, from 彼 (1), 私 (2), and 女 (3) to the 357 kanji that occur once (2663). Most of
+the sentences come from the Tanaka Corpus, sentences that students wrote, so its ranks favour 彼
+and 私.
+
+### 6.12 Stage 11: Write `content.db`
+
+Stage 11 writes a new file and replaces `content.db` only after all checks pass. A failed build thus
 leaves the previous `content.db` unchanged.
 
 1. Open `content.db.tmp` in the output directory.
-2. Create the 24 tables and the indexes with the statements of `jpdag::schema`.
+2. Create the 25 tables and the indexes with the statements of `jpdag::schema`.
 3. Set `PRAGMA user_version` to `SCHEMA_VERSION`.
 4. Insert all rows in 1 transaction.
 5. Run `PRAGMA foreign_key_check`.
@@ -885,10 +929,10 @@ leaves the previous `content.db` unchanged.
 The foreign keys are off during the insert. Step 5 checks all rows at the end, and the error gives
 the number of rows that fail. A failed build deletes `content.db.tmp`.
 
-Stage 10 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana,
-Kanjium, and Jiten. The code holds the licence and the attribution text of each source. The
-versions of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten come from stages 1, 3, 6,
-7, 8, and 9. The version of Kanji alive is NULL,
+Stage 11 writes 1 `source` row for JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana,
+Kanjium, Jiten, and Tatoeba. The code holds the licence and the attribution text of each source.
+The versions of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, Jiten, and Tatoeba come from
+stages 1, 3, 6, 7, 8, 9, and 10. The version of Kanji alive is NULL,
 because `data/mutants.tsv` holds its data.
 
 The `rusqlite` crate compiles its own SQLite, so `ingest` and the app use the same SQLite version.
@@ -925,6 +969,8 @@ report shows what the sources gave and what the pipeline discarded:
 - number of Jiten entries, the number of entries that are no word, the number of entries of 2 or
   more words that go to the 1 common word, and the number that go to no word
 - number of words with a rank
+- number of Tatoeba sentences and of the kanji in them, the number of kanji with a rank, and each
+  kanji of the sentences that is not in the character set
 - size of `content.db`
 
 ## 8. Tests and CI
@@ -958,7 +1004,8 @@ cargo test -p ingest --test build_checks -- --ignored
 | `expected_mutants_exist` | `mutant` holds 亻 → 人, 氵 → 水, 忄 → 心, ⺗ → 心, ⻞ → 食, and 艹 → 艸 |
 | `one_row_for_each_jmdict_element` | Numbers of `written_form`, `reading`, `sense`, and `gloss` rows equal the numbers of `<k_ele>`, `<r_ele>`, `<sense>`, and `<gloss>` elements in JMdict |
 | `each_word_has_a_reading_and_a_sense` | Each `word` row has 1 or more `reading` rows and 1 or more `sense` rows |
-| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten, and the rows of JMdict, KanjiVG, KANJIDIC2, JmdictFurigana, Kanjium, and Jiten have a version |
+| `sources_have_versions` | `source` holds JMdict, KanjiVG, Kanji alive, KANJIDIC2, JmdictFurigana, Kanjium, Jiten, and Tatoeba, and the rows of all but Kanji alive have a version |
+| `kanji_have_frequency_ranks` | 人, 日, and 一 are in the top 20, 道 has a better rank than 径, and 2,500 or more kanji have a rank |
 | `golden_character_details_exist` | 語 has the meanings word, speech, and language in that order, the on reading ゴ, and the kun readings かた.る and かた.らう |
 | `mutants_keep_their_radical_meanings` | 氵 has the meaning water, and ⻞, which has no KANJIDIC2 entry, has no meaning and no reading |
 | `readings_have_word_counts` | More words use ゴ of 語 than かた.る, かた.る has a count, and ガク of 学 has a count of 100 or more |
@@ -972,7 +1019,7 @@ cargo test -p ingest --test build_checks -- --ignored
 | Job | Steps |
 | --- | --- |
 | `test` | `cargo fmt --check`, `cargo clippy`, and `cargo test --workspace` |
-| `build-checks` | `fetch.sh`, a full build, and the build checks |
+| `build-checks` | `fetch.sh`, `fetch-tatoeba.sh`, a full build, and the build checks |
 
 The workflow runs on each pull request, on each push to `main`, and each Monday. The Monday run
 checks new source data. The `build-checks` job keeps the sources in the cache for 1 day,
@@ -1161,11 +1208,20 @@ Each row gives the name of the test function of the case.
 | `word_rank_is_the_best_rank_of_its_forms_and_readings` | 一寸 47988 and ちょっと 46㋕ with `uk`, 休み 80, 慣れる 948 and なれる 402㋕ with no `uk` and a word 馴れる, and 綺麗 7364 and きれい 675㋕ | 一寸 has 46, 休み 80, 慣れる 948, and 綺麗 675 |
 | `reads_the_banks_of_a_zip_in_order` | A zip with `term_meta_bank_2.json`, `index.json`, `term_meta_bank_1.json`, and a stylesheet | The index, and the banks in the order 1, 2 |
 
+### `kanji_frequency.rs`
+
+| Test | Input | Expected result |
+| --- | --- | --- |
+| `ranks_by_count_and_ties_share_a_rank` | 3 sentences with 日 3 times, 本 twice, and 読, 山, and 川 once, and 々 | 日 1, 本 2, and 山, 川, and 読 3. 々 is not counted. |
+| `a_kanji_outside_the_set_keeps_its_place_in_the_ranks` | 犬犬猫, with 猫 alone in the set | 猫 has rank 2, and the report lists 犬 |
+| `counts_a_compatibility_ideograph_as_its_unified_kanji` | U+F9DC and 隆 | 隆 has the count 2 |
+| `reads_the_version_from_the_folder` | `tatoeba-2026-10-17`, and `other` | 2026-10-17, and no version |
+
 ### `db.rs`
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `empty_build_creates_the_schema` | A build with no rows | 24 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
+| `empty_build_creates_the_schema` | A build with no rows | 25 tables and the indexes of section 5. `PRAGMA user_version` equals `SCHEMA_VERSION`. |
 | `rows_round_trip` | A small set of rows | Same rows in each table |
 | `foreign_key_violation_fails_the_build` | A `written_form_kanji` row whose `kanji_id` has no `character` row | Build fails, and no `content.db` exists |
 | `failed_build_keeps_the_previous_db` | A failure after the insert, with a previous `content.db` | Previous `content.db` is unchanged, and no `content.db.tmp` exists |
@@ -1174,7 +1230,7 @@ Each row gives the name of the test function of the case.
 
 | Test | Input | Expected result |
 | --- | --- | --- |
-| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 24 tables equal the rows in `tests/fixtures/expected.tsv` |
+| `fixture_rows_equal_expected` | Fixture sources in `tests/fixtures/` | Rows of the 25 tables equal the rows in `tests/fixtures/expected.tsv` |
 | `two_runs_give_the_same_rows` | 2 runs on the same fixtures | Same rows in each table |
 | `report_counts_match_the_fixtures` | Fixture sources | Counts in the build report that match the fixtures |
 
@@ -1198,3 +1254,5 @@ The fixtures hold:
   give ranks to written forms and readings of 鳥渡, 明日, 語る, and 休み, with 1 entry of 一寸 that
   is 2 words, 1 entry in kana that an entry with a reading already ranks, and 2 entries that are no
   word.
+- 3 Japanese sentences of Tatoeba in `tatoeba-2026-10-17/`, with 日 3 times, 休 twice, and 人, 明,
+  and 月 once, and 曜 and 猫, which are not in the character set
