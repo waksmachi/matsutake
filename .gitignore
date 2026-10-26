@@ -9,3 +9,4 @@
 /app/.dart_tool/
 .fvm/
 .claude/
+.env
